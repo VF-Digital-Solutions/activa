@@ -280,3 +280,41 @@ export interface HouseholdRoutineOccurrence {
   proof_image_url: string | null;
   created_at: string;
 }
+
+// ── Agenda ────────────────────────────────────────────────────────────────────
+
+export type AgendaEventType = "PERSONAL" | "HOUSEHOLD" | "REMINDER";
+export type AgendaSource = "reservation" | "task" | "habit" | "event" | "reminder";
+
+export interface AgendaEvent {
+  id: string;
+  title: string;
+  description: string;
+  event_type: AgendaEventType;
+  starts_at: string;
+  ends_at: string | null;
+  is_all_day: boolean;
+  household_node: string | null;
+  attendees_info: { id: string; email: string; full_name: string }[];
+  remind_at: string | null;
+  channels: string[];
+  reminder_sent: boolean;
+  color: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgendaItem {
+  id: string;
+  source: AgendaSource;
+  source_id: string;
+  type: string;
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  is_all_day: boolean;
+  status: string | null;
+  color: string | null;
+  metadata: Record<string, unknown>;
+}

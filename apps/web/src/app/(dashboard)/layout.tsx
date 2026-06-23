@@ -11,23 +11,19 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, refreshToken } = useAuthStore();
+  const { isAuthenticated, refreshToken, _hasHydrated } = useAuthStore();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const devBypass = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true";
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted && !isAuthenticated && !devBypass) {
+    if (!_hasHydrated) return;
+    if (!isAuthenticated && !devBypass) {
       router.push("/login");
     }
-  }, [mounted, isAuthenticated, router, devBypass]);
+  }, [_hasHydrated, isAuthenticated, router, devBypass]);
 
-  if (!mounted) return null;
+  if (!_hasHydrated) return null;
   if (!isAuthenticated && !devBypass) return null;
 
   const handleLogout = async () => {
@@ -61,7 +57,7 @@ export default function DashboardLayout({
             { label: "Activos", href: "/assets" },
             { label: "Finanzas", href: "/finances" },
             { label: "Rutinas", href: "/routines" },
-            { label: "Reservas", href: "/reservations" },
+            { label: "Agenda", href: "/agenda" },
             { label: "Beneficios", href: "/benefits" },
           ].map((item) => (
             <Link
@@ -102,7 +98,7 @@ export default function DashboardLayout({
           { label: "Activos", href: "/assets" },
           { label: "Finanzas", href: "/finances" },
           { label: "Rutinas", href: "/routines" },
-          { label: "Reservas", href: "/reservations" },
+          { label: "Agenda", href: "/agenda" },
         ].map((item) => (
           <Link
             key={item.href}

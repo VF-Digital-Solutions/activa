@@ -16,6 +16,7 @@ const nextConfig = withTamagui({
     "*.ngrok.app",
     "*.loca.lt",
     "*.tunnel.app",
+    "192.168.1.127",
   ],
   async rewrites() {
     const apiUrl = process.env["API_INTERNAL_URL"] || "http://localhost:8000";
