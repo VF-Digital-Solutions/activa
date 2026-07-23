@@ -318,3 +318,59 @@ export interface AgendaItem {
   color: string | null;
   metadata: Record<string, unknown>;
 }
+
+// ── Assessment ───────────────────────────────────────────────────────────────
+
+export type AssessmentType = "AUDIT_7_AREAS" | "HEALTH_SCALE_10";
+
+export type CapitalDimension =
+  | "PHYSICAL"
+  | "EMOTIONAL"
+  | "RELATIONAL"
+  | "COGNITIVE"
+  | "MORAL"
+  | "TRANSCENDENTAL"
+  | "STRENGTHS";
+
+export type ScaleType = "SCALE_1_10";
+
+export type AssessmentAttemptStatus = "IN_PROGRESS" | "COMPLETED";
+
+export interface AssessmentQuestion {
+  id: string;
+  order: number;
+  text: string;
+  capital_dimension: CapitalDimension;
+  scale_type: ScaleType;
+}
+
+export interface Assessment {
+  id: string;
+  type: AssessmentType;
+  version: number;
+  title: string;
+  description: string;
+  questions: AssessmentQuestion[];
+}
+
+export interface AssessmentAttempt {
+  id: string;
+  assessment: Assessment;
+  status: AssessmentAttemptStatus;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface AssessmentResponseRecord {
+  id: string;
+  question: string;
+  score: number;
+  created_at: string;
+}
+
+export interface AssessmentSnapshot {
+  id: string;
+  attempt: string;
+  snapshot_date: string;
+  scores_by_dimension: Record<string, number>;
+}

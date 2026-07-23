@@ -53,6 +53,7 @@ export default function DashboardLayout({
           </p>
           {[
             { label: "Dashboard", href: "/dashboard" },
+            { label: "Evaluación", href: "/assessment" },
             // Disabled for Activa MVP (2026-07-23): HomeTrack household-management
             // modules, not used in the current Activa scope. Routes kept in place
             // (renamed with "_" prefix), not deleted.
@@ -98,6 +99,7 @@ export default function DashboardLayout({
       <nav className="fixed bottom-0 left-0 right-0 bg-[#0A0A0A] border-t border-[#2A2A2A] flex md:hidden">
         {[
           { label: "Dashboard", href: "/dashboard" },
+          { label: "Evaluación", href: "/assessment" },
           // Disabled for Activa MVP (2026-07-23): see sidebar nav above.
           // { label: "Activos", href: "/assets" },
           // { label: "Finanzas", href: "/finances" },
