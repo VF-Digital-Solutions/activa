@@ -1,6 +1,7 @@
 import apiClient from "@/lib/api/axios";
 import type {
   AssessmentAttempt,
+  AssessmentEvolution,
   AssessmentResponseRecord,
   AssessmentSnapshot,
   AssessmentType,
@@ -31,7 +32,7 @@ export const assessmentService = {
     return response.data;
   },
 
-  evolution: async (type: AssessmentType) => {
+  evolution: async (type: AssessmentType): Promise<AssessmentEvolution> => {
     const response = await apiClient.get("/assessment/evolution/", {
       params: { type },
     });

@@ -93,7 +93,7 @@ export default function AssessmentWizardPage() {
 
       if (isLast) {
         await assessmentService.complete(attempt.id);
-        router.push(`/assessment/${params.type}/results?attempt=${attempt.id}`);
+        router.push(`/assessment/${params.type}/results`);
         return;
       }
 

@@ -374,3 +374,14 @@ export interface AssessmentSnapshot {
   snapshot_date: string;
   scores_by_dimension: Record<string, number>;
 }
+
+export interface AssessmentEvolutionEntry {
+  snapshot_date: string;
+  scores_by_dimension: Record<string, number>;
+  deltas: Record<string, number>;
+}
+
+export interface AssessmentEvolution {
+  baseline: AssessmentSnapshot | null;
+  evolution: AssessmentEvolutionEntry[];
+}

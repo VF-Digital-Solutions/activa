@@ -24,3 +24,17 @@ export const CAPITAL_DIMENSION_LABEL: Record<CapitalDimension, string> = {
   TRANSCENDENTAL: "Trascendental",
   STRENGTHS: "Fortalezas",
 };
+
+// Canonical display order. Key order on scores_by_dimension objects coming
+// back from the API is not guaranteed (JSON round-trips through MySQL don't
+// preserve insertion order), so any UI listing dimensions must sort by this
+// instead of trusting Object.entries() order.
+export const CAPITAL_DIMENSION_ORDER: CapitalDimension[] = [
+  "PHYSICAL",
+  "EMOTIONAL",
+  "RELATIONAL",
+  "COGNITIVE",
+  "MORAL",
+  "TRANSCENDENTAL",
+  "STRENGTHS",
+];
