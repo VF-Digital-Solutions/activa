@@ -5,20 +5,22 @@ import { isAxiosError } from "axios";
 import Link from "next/link";
 import { timeBlockService } from "@/services/timeBlocks";
 import {
+  addUtcDays,
   blockDateKey,
   ENERGY_TAG_COLOR,
   ENERGY_TAG_LABEL,
+  ENERGY_TAG_ORDER,
   EXISTENTIAL_CATEGORY_COLOR,
   EXISTENTIAL_CATEGORY_LABEL,
   EXISTENTIAL_CATEGORY_ORDER,
+  formatUtcDate,
   toDateKey,
+  todayUtc,
 } from "@/lib/agenda";
 import type { EnergyTag, ExistentialCategory, TimeBlock } from "@/types";
 
 type ViewMode = "day" | "week";
 type LogMode = "planned" | "retroactive";
-
-const ENERGY_TAG_ORDER: EnergyTag[] = ["ENERGIZES", "NEUTRAL", "DRAINS"];
 
 function toLocalDatetimeInputValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -27,19 +29,11 @@ function toLocalDatetimeInputValue(date: Date): string {
   )}:${pad(date.getMinutes())}`;
 }
 
+// UTC-anchored: mirrors the backend's UTC date-bucketing, see lib/agenda.ts.
 function startOfWeek(date: Date): Date {
-  const result = new Date(date);
-  const day = result.getDay();
+  const day = date.getUTCDay();
   const diff = (day + 6) % 7; // Monday = 0
-  result.setDate(result.getDate() - diff);
-  result.setHours(0, 0, 0, 0);
-  return result;
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
+  return addUtcDays(date, -diff);
 }
 
 const WEEKDAY_LABEL = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -275,11 +269,7 @@ export default function AgendaPage() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [showForm, setShowForm] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today;
-  });
+  const [selectedDate, setSelectedDate] = useState(todayUtc);
 
   useEffect(() => {
     let cancelled = false;
@@ -321,15 +311,15 @@ export default function AgendaPage() {
 
   const weekStart = useMemo(() => startOfWeek(selectedDate), [selectedDate]);
   const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    () => Array.from({ length: 7 }, (_, i) => addUtcDays(weekStart, i)),
     [weekStart]
   );
 
-  const selectedKey = toDateKey(selectedDate.toISOString());
+  const selectedKey = toDateKey(selectedDate);
   const dayBlocks = blocksByDate.get(selectedKey) ?? [];
 
   const shiftDate = (deltaDays: number) => {
-    setSelectedDate((current) => addDays(current, deltaDays));
+    setSelectedDate((current) => addUtcDays(current, deltaDays));
   };
 
   return (
@@ -375,9 +365,14 @@ export default function AgendaPage() {
         >
           {showForm ? "Cancelar" : "+ Nuevo bloque"}
         </button>
-        <Link href="/agenda/day-close" className="text-sm text-[#C8A96B] hover:underline">
-          Cerrar el día →
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/agenda/balance" className="text-sm text-[#C8A96B] hover:underline">
+            Balance del día
+          </Link>
+          <Link href="/agenda/day-close" className="text-sm text-[#C8A96B] hover:underline">
+            Cerrar el día →
+          </Link>
+        </div>
       </div>
 
       {showForm && (
@@ -401,15 +396,11 @@ export default function AgendaPage() {
         </button>
         <span className="text-sm text-[#EAE6DD]">
           {viewMode === "day"
-            ? selectedDate.toLocaleDateString("es", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              })
-            : `${weekStart.toLocaleDateString("es", { day: "numeric", month: "short" })} – ${addDays(
-                weekStart,
-                6
-              ).toLocaleDateString("es", { day: "numeric", month: "short" })}`}
+            ? formatUtcDate(selectedDate, { weekday: "long", day: "numeric", month: "long" })
+            : `${formatUtcDate(weekStart, { day: "numeric", month: "short" })} – ${formatUtcDate(
+                addUtcDays(weekStart, 6),
+                { day: "numeric", month: "short" }
+              )}`}
         </span>
         <button
           type="button"
@@ -441,7 +432,7 @@ export default function AgendaPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-7 gap-3">
           {weekDays.map((day, index) => {
-            const key = toDateKey(day.toISOString());
+            const key = toDateKey(day);
             const items = blocksByDate.get(key) ?? [];
             return (
               <div
@@ -449,7 +440,7 @@ export default function AgendaPage() {
                 className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-3 space-y-2"
               >
                 <p className="text-xs text-[#5A6A5A] uppercase tracking-wide">
-                  {WEEKDAY_LABEL[index]} {day.getDate()}
+                  {WEEKDAY_LABEL[index]} {day.getUTCDate()}
                 </p>
                 {items.length === 0 ? (
                   <p className="text-[#5A6A5A] text-xs">—</p>

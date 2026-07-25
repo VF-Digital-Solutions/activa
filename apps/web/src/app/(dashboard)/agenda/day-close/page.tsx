@@ -5,12 +5,15 @@ import { isAxiosError } from "axios";
 import Link from "next/link";
 import { timeBlockService } from "@/services/timeBlocks";
 import {
+  addUtcDays,
   blockDateKey,
   ENERGY_TAG_COLOR,
   ENERGY_TAG_LABEL,
   EXISTENTIAL_CATEGORY_COLOR,
   EXISTENTIAL_CATEGORY_LABEL,
+  formatUtcDate,
   toDateKey,
+  todayUtc,
 } from "@/lib/agenda";
 import type { DayCloseResult, TimeBlock, TimeBlockStatus } from "@/types";
 
@@ -19,23 +22,13 @@ interface Decision {
   replacedBy: string;
 }
 
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
 export default function DayClosePage() {
   const [blocks, setBlocks] = useState<TimeBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<DayCloseResult | null>(null);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today;
-  });
+  const [selectedDate, setSelectedDate] = useState(todayUtc);
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
 
   useEffect(() => {
@@ -60,7 +53,7 @@ export default function DayClosePage() {
     };
   }, []);
 
-  const selectedKey = toDateKey(selectedDate.toISOString());
+  const selectedKey = toDateKey(selectedDate);
 
   // "Planned for the day" mirrors the backend's coherence-index scope:
   // blocks whose own start_datetime falls on this date (retroactive entries
@@ -192,21 +185,17 @@ export default function DayClosePage() {
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => setSelectedDate((d) => addDays(d, -1))}
+          onClick={() => setSelectedDate((d) => addUtcDays(d, -1))}
           className="text-sm text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
         >
           ← Anterior
         </button>
         <span className="text-sm text-[#EAE6DD]">
-          {selectedDate.toLocaleDateString("es", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-          })}
+          {formatUtcDate(selectedDate, { weekday: "long", day: "numeric", month: "long" })}
         </span>
         <button
           type="button"
-          onClick={() => setSelectedDate((d) => addDays(d, 1))}
+          onClick={() => setSelectedDate((d) => addUtcDays(d, 1))}
           className="text-sm text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
         >
           Siguiente →
