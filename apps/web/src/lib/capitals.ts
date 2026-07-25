@@ -1,4 +1,4 @@
-import type { Emotion } from "@/types";
+import type { Emotion, TrendDirection } from "@/types";
 
 export const EMOTION_ORDER: Emotion[] = [
   "JOY",
@@ -47,3 +47,19 @@ export const EMOTION_COLOR: Record<Emotion, string> = EMOTION_ORDER.reduce(
   }),
   {} as Record<Emotion, string>
 );
+
+export const TREND_LABEL: Record<TrendDirection, string> = {
+  IMPROVING: "Mejorando",
+  DECLINING: "Bajando",
+  STABLE: "Estable",
+  INSUFFICIENT_DATA: "Datos insuficientes",
+};
+
+// Same status-color convention as EMOTION_COLOR: green for a positive signal,
+// red for a negative one, neutral gray otherwise.
+export const TREND_COLOR: Record<TrendDirection, string> = {
+  IMPROVING: "#7FB88A",
+  DECLINING: "#C4685A",
+  STABLE: "#5A6A5A",
+  INSUFFICIENT_DATA: "#5A6A5A",
+};

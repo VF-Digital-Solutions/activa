@@ -1,5 +1,5 @@
 import apiClient from "@/lib/api/axios";
-import type { Emotion, EmotionalLog, JournalEntry } from "@/types";
+import type { Emotion, EmotionalAggregates, EmotionalLog, JournalEntry } from "@/types";
 
 export interface CreateEmotionalLogPayload {
   emotion: Emotion;
@@ -10,6 +10,18 @@ export interface CreateEmotionalLogPayload {
 export const emotionalLogService = {
   create: async (payload: CreateEmotionalLogPayload): Promise<EmotionalLog> => {
     const response = await apiClient.post("/capitals/emotional-logs/", payload);
+    return response.data;
+  },
+
+  list: async (): Promise<EmotionalLog[]> => {
+    const response = await apiClient.get("/capitals/emotional-logs/");
+    return response.data;
+  },
+
+  aggregates: async (window: 7 | 30): Promise<EmotionalAggregates> => {
+    const response = await apiClient.get("/capitals/emotional-logs/aggregates/", {
+      params: { window },
+    });
     return response.data;
   },
 };

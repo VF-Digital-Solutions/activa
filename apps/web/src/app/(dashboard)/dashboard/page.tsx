@@ -18,9 +18,17 @@ function QuickEmotionalLog() {
     <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-[#EAE6DD]">¿Cómo te sientes?</h3>
-        {justLogged && (
-          <span className="text-xs text-[#7FB88A]">Registrado ✓</span>
-        )}
+        <div className="flex items-center gap-3">
+          {justLogged && (
+            <span className="text-xs text-[#7FB88A]">Registrado ✓</span>
+          )}
+          <Link
+            href="/capitals/mood-history"
+            className="text-xs text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
+          >
+            Ver historial
+          </Link>
+        </div>
       </div>
 
       <EmotionalLogForm

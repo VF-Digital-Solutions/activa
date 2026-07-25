@@ -477,3 +477,21 @@ export interface JournalEntry {
   recorded_at: string;
   created_at: string;
 }
+
+export type TrendDirection = "IMPROVING" | "DECLINING" | "STABLE" | "INSUFFICIENT_DATA";
+
+export interface EmotionCount {
+  emotion: Emotion;
+  count: number;
+}
+
+export interface EmotionalAggregates {
+  window_days: number;
+  start_date: string;
+  end_date: string;
+  total_entries: number;
+  average_intensity: number | null;
+  emotion_counts: EmotionCount[];
+  dominant_emotions: Emotion[];
+  trend_direction: TrendDirection;
+}
