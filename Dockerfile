@@ -13,7 +13,7 @@ RUN npm ci
 FROM deps AS builder
 
 COPY . .
-RUN npm run build --filter=web
+RUN cd apps/web && npm run build
 
 # ── production: imagen mínima con el standalone output ────────────────────────
 FROM node:20-slim AS production
@@ -34,4 +34,5 @@ FROM deps AS development
 COPY . .
 ENV NODE_ENV=development
 EXPOSE 3000
-CMD ["npm", "run", "web"]
+WORKDIR /app/apps/web
+CMD ["npm", "run", "dev"]
