@@ -495,3 +495,14 @@ export interface EmotionalAggregates {
   dominant_emotions: Emotion[];
   trend_direction: TrendDirection;
 }
+
+// ── Insight (IVI) ─────────────────────────────────────────────────────────────
+
+export interface IVISnapshot {
+  snapshot_date: string;
+  ivi: number;
+  assets: number;
+  liabilities: number;
+  adaptation: number;
+  assets_by_dimension: Record<string, number>;
+}
