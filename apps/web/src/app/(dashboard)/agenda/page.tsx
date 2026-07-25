@@ -254,7 +254,7 @@ function CalendarView({
                   {dayItems.slice(0, 2).map((item, idx) => {
                     const cfg = SOURCE_CONFIG[item.source];
                     return (
-                      <div key={idx} className="flex items-center gap-0.5 w-full overflow-hidden">
+                      <div key={idx} className="relative group flex items-center gap-0.5 w-full">
                         <span
                           className="w-1.5 h-1.5 rounded-full shrink-0"
                           style={{ backgroundColor: cfg?.color ?? "#888" }}
@@ -262,6 +262,19 @@ function CalendarView({
                         <span className="truncate text-[10px] leading-tight text-[#B0A898]">
                           {formatItemTime(item)} {item.title}
                         </span>
+                        <div className="absolute bottom-full left-0 mb-1.5 z-[200] invisible group-hover:visible pointer-events-none w-max max-w-[220px]">
+                          <div className="bg-[#1C1C1C] border border-[#3A3A3A] rounded-lg p-2.5 shadow-2xl">
+                            <p className="text-xs font-medium text-[#EAE6DD] leading-snug">{item.title}</p>
+                            <p className="text-[10px] text-[#5A6A5A] mt-1">{formatItemTime(item)}</p>
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded mt-1.5 inline-block"
+                              style={{ backgroundColor: `${cfg?.color ?? "#888"}22`, color: cfg?.color ?? "#888" }}
+                            >
+                              {cfg?.label ?? item.source}
+                            </span>
+                          </div>
+                          <div className="w-2 h-2 bg-[#1C1C1C] border-r border-b border-[#3A3A3A] rotate-45 ml-2 -mt-1" />
+                        </div>
                       </div>
                     );
                   })}
