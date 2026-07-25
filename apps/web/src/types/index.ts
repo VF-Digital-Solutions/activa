@@ -466,3 +466,14 @@ export interface EmotionalLog {
   recorded_at: string;
   created_at: string;
 }
+
+export interface JournalEntry {
+  id: string;
+  energy_gain: string;
+  energy_drain: string;
+  avoided_conversation: string;
+  attention_needed: string;
+  gratitude: string;
+  recorded_at: string;
+  created_at: string;
+}

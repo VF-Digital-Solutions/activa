@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
 import Link from "next/link";
 import { timeBlockService } from "@/services/timeBlocks";
+import { emotionalLogService, journalService } from "@/services/capitals";
+import { EmotionalLogForm } from "@/components/shared/EmotionalLogForm";
 import {
   addUtcDays,
   blockDateKey,
@@ -22,6 +24,19 @@ interface Decision {
   replacedBy: string;
 }
 
+type Step = "agenda" | "emotional" | "journal";
+
+const JOURNAL_QUESTIONS: {
+  field: "energy_gain" | "energy_drain" | "avoided_conversation" | "attention_needed" | "gratitude";
+  question: string;
+}[] = [
+  { field: "energy_gain", question: "¿Qué te dio energía hoy?" },
+  { field: "energy_drain", question: "¿Qué te la drenó?" },
+  { field: "avoided_conversation", question: "¿Qué conversación estás evitando?" },
+  { field: "attention_needed", question: "¿Qué parte de ti necesita atención?" },
+  { field: "gratitude", question: "¿Qué merece tu gratitud?" },
+];
+
 export default function DayClosePage() {
   const [blocks, setBlocks] = useState<TimeBlock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +45,9 @@ export default function DayClosePage() {
   const [result, setResult] = useState<DayCloseResult | null>(null);
   const [selectedDate, setSelectedDate] = useState(todayUtc);
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [step, setStep] = useState<Step>("agenda");
+  const [emotionsLoggedCount, setEmotionsLoggedCount] = useState(0);
+  const [journal, setJournal] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -94,12 +112,15 @@ export default function DayClosePage() {
     }));
   };
 
-  const decidedCount = Object.keys(decisions).length;
-
-  const handleSubmit = async () => {
+  const handleFinish = async () => {
     setSubmitting(true);
     setError(null);
     try {
+      const journalHasContent = Object.values(journal).some((value) => value.trim());
+      if (journalHasContent) {
+        await journalService.upsertToday(journal);
+      }
+
       const resolutions = Object.entries(decisions).map(([blockId, decision]) => ({
         block: blockId,
         status: decision.status,
@@ -111,7 +132,7 @@ export default function DayClosePage() {
       setResult(response);
     } catch (err) {
       if (isAxiosError(err)) {
-        setError("No se pudo cerrar el día. Revisa las resoluciones e intenta de nuevo.");
+        setError("No se pudo cerrar el día. Revisa la información e intenta de nuevo.");
       } else {
         setError("Ocurrió un error inesperado.");
       }
@@ -166,6 +187,13 @@ export default function DayClosePage() {
           </p>
         </div>
 
+        {emotionsLoggedCount > 0 && (
+          <p className="text-[#5A6A5A] text-sm text-center">
+            {emotionsLoggedCount} emoción{emotionsLoggedCount !== 1 ? "es" : ""} registrada
+            {emotionsLoggedCount !== 1 ? "s" : ""} hoy
+          </p>
+        )}
+
         <Link href="/agenda" className="text-sm text-[#C8A96B] hover:underline">
           ← Volver a la agenda
         </Link>
@@ -178,151 +206,229 @@ export default function DayClosePage() {
       <div>
         <h2 className="text-2xl font-semibold text-[#EAE6DD]">Cerrar el día</h2>
         <p className="text-[#5A6A5A] text-sm mt-1">
-          Revisa lo planificado: confirma, omite o reasigna cada bloque.
+          {step === "agenda" && "1/3 · Revisa lo planificado: confirma, omite o reasigna."}
+          {step === "emotional" && "2/3 · ¿Cómo te sientes al cierre del día?"}
+          {step === "journal" && "3/3 · Unas preguntas para reflexionar."}
         </p>
       </div>
 
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => setSelectedDate((d) => addUtcDays(d, -1))}
-          className="text-sm text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
-        >
-          ← Anterior
-        </button>
-        <span className="text-sm text-[#EAE6DD]">
-          {formatUtcDate(selectedDate, { weekday: "long", day: "numeric", month: "long" })}
-        </span>
-        <button
-          type="button"
-          onClick={() => setSelectedDate((d) => addUtcDays(d, 1))}
-          className="text-sm text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
-        >
-          Siguiente →
-        </button>
-      </div>
+      {step === "agenda" && (
+        <>
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setSelectedDate((d) => addUtcDays(d, -1))}
+              className="text-sm text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
+            >
+              ← Anterior
+            </button>
+            <span className="text-sm text-[#EAE6DD]">
+              {formatUtcDate(selectedDate, { weekday: "long", day: "numeric", month: "long" })}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedDate((d) => addUtcDays(d, 1))}
+              className="text-sm text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
+            >
+              Siguiente →
+            </button>
+          </div>
 
-      {loading ? (
-        <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-8 text-center">
-          <p className="text-[#5A6A5A] text-sm">Cargando bloques planificados...</p>
-        </div>
-      ) : plannedForDay.length === 0 ? (
-        <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-8 text-center">
-          <p className="text-[#5A6A5A] text-sm">
-            No hay bloques planificados para este día.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {pending.map((block) => {
-            const decision = decisions[block.id];
-            const categoryColor = EXISTENTIAL_CATEGORY_COLOR[block.existential_category];
-            const energyColor = ENERGY_TAG_COLOR[block.energy_tag];
-
-            return (
-              <div
-                key={block.id}
-                className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-4 space-y-3 border-l-4"
-                style={{ borderLeftColor: categoryColor }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm text-[#EAE6DD] font-medium">{block.title}</p>
-                  <span className="text-xs text-[#5A6A5A]">
-                    {block.duration_minutes} min
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-xs">
-                  <span style={{ color: categoryColor }}>
-                    {EXISTENTIAL_CATEGORY_LABEL[block.existential_category]}
-                  </span>
-                  <span style={{ color: energyColor }}>
-                    {ENERGY_TAG_LABEL[block.energy_tag]}
-                  </span>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDecision(block.id, "FULFILLED")}
-                    className={`flex-1 text-sm px-3 py-1.5 rounded border transition-colors ${
-                      decision?.status === "FULFILLED"
-                        ? "bg-[#7FB88A]/20 border-[#7FB88A] text-[#7FB88A]"
-                        : "border-[#2A2A2A] text-[#5A6A5A] hover:text-[#EAE6DD]"
-                    }`}
-                  >
-                    Cumplido
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDecision(block.id, "OMITTED")}
-                    className={`flex-1 text-sm px-3 py-1.5 rounded border transition-colors ${
-                      decision?.status === "OMITTED"
-                        ? "bg-[#C4685A]/20 border-[#C4685A] text-[#C4685A]"
-                        : "border-[#2A2A2A] text-[#5A6A5A] hover:text-[#EAE6DD]"
-                    }`}
-                  >
-                    Omitido
-                  </button>
-                </div>
-
-                {decision?.status === "OMITTED" && (
-                  <select
-                    value={decision.replacedBy}
-                    onChange={(e) => setReassignment(block.id, e.target.value)}
-                    className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded px-3 py-2 text-xs text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]/50"
-                  >
-                    <option value="">Sin reasignar</option>
-                    {reassignCandidates
-                      .filter((candidate) => candidate.id !== block.id)
-                      .map((candidate) => (
-                        <option key={candidate.id} value={candidate.id}>
-                          Reasignado a: {candidate.title}
-                        </option>
-                      ))}
-                  </select>
-                )}
-              </div>
-            );
-          })}
-
-          {alreadyResolved.length > 0 && (
-            <div className="pt-2">
-              <p className="text-xs text-[#5A6A5A] uppercase tracking-wide mb-2">
-                Ya resueltos
+          {loading ? (
+            <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-8 text-center">
+              <p className="text-[#5A6A5A] text-sm">Cargando bloques planificados...</p>
+            </div>
+          ) : plannedForDay.length === 0 ? (
+            <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-8 text-center">
+              <p className="text-[#5A6A5A] text-sm">
+                No hay bloques planificados para este día.
               </p>
-              <div className="space-y-2">
-                {alreadyResolved.map((block) => (
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pending.map((block) => {
+                const decision = decisions[block.id];
+                const categoryColor = EXISTENTIAL_CATEGORY_COLOR[block.existential_category];
+                const energyColor = ENERGY_TAG_COLOR[block.energy_tag];
+
+                return (
                   <div
                     key={block.id}
-                    className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg p-3 flex items-center justify-between text-sm"
+                    className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-4 space-y-3 border-l-4"
+                    style={{ borderLeftColor: categoryColor }}
                   >
-                    <span className="text-[#EAE6DD]">{block.title}</span>
-                    <span className="text-[#5A6A5A] text-xs">
-                      {block.status === "FULFILLED" ? "Cumplido" : "Omitido"}
-                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm text-[#EAE6DD] font-medium">{block.title}</p>
+                      <span className="text-xs text-[#5A6A5A]">
+                        {block.duration_minutes} min
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span style={{ color: categoryColor }}>
+                        {EXISTENTIAL_CATEGORY_LABEL[block.existential_category]}
+                      </span>
+                      <span style={{ color: energyColor }}>
+                        {ENERGY_TAG_LABEL[block.energy_tag]}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDecision(block.id, "FULFILLED")}
+                        className={`flex-1 text-sm px-3 py-1.5 rounded border transition-colors ${
+                          decision?.status === "FULFILLED"
+                            ? "bg-[#7FB88A]/20 border-[#7FB88A] text-[#7FB88A]"
+                            : "border-[#2A2A2A] text-[#5A6A5A] hover:text-[#EAE6DD]"
+                        }`}
+                      >
+                        Cumplido
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDecision(block.id, "OMITTED")}
+                        className={`flex-1 text-sm px-3 py-1.5 rounded border transition-colors ${
+                          decision?.status === "OMITTED"
+                            ? "bg-[#C4685A]/20 border-[#C4685A] text-[#C4685A]"
+                            : "border-[#2A2A2A] text-[#5A6A5A] hover:text-[#EAE6DD]"
+                        }`}
+                      >
+                        Omitido
+                      </button>
+                    </div>
+
+                    {decision?.status === "OMITTED" && (
+                      <select
+                        value={decision.replacedBy}
+                        onChange={(e) => setReassignment(block.id, e.target.value)}
+                        className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded px-3 py-2 text-xs text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]/50"
+                      >
+                        <option value="">Sin reasignar</option>
+                        {reassignCandidates
+                          .filter((candidate) => candidate.id !== block.id)
+                          .map((candidate) => (
+                            <option key={candidate.id} value={candidate.id}>
+                              Reasignado a: {candidate.title}
+                            </option>
+                          ))}
+                      </select>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
+
+              {alreadyResolved.length > 0 && (
+                <div className="pt-2">
+                  <p className="text-xs text-[#5A6A5A] uppercase tracking-wide mb-2">
+                    Ya resueltos
+                  </p>
+                  <div className="space-y-2">
+                    {alreadyResolved.map((block) => (
+                      <div
+                        key={block.id}
+                        className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg p-3 flex items-center justify-between text-sm"
+                      >
+                        <span className="text-[#EAE6DD]">{block.title}</span>
+                        <span className="text-[#5A6A5A] text-xs">
+                          {block.status === "FULFILLED" ? "Cumplido" : "Omitido"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-        </div>
+
+          <div className="flex items-center justify-between">
+            <Link href="/agenda" className="text-sm text-[#5A6A5A] hover:text-[#C8A96B]">
+              ← Volver a la agenda
+            </Link>
+            <button
+              type="button"
+              onClick={() => setStep("emotional")}
+              className="bg-[#C8A96B] text-[#0D0D0D] font-semibold px-4 py-2 rounded text-sm hover:bg-[#D4B87A] transition-colors"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </>
       )}
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {step === "emotional" && (
+        <>
+          <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-6">
+            <EmotionalLogForm
+              onSubmit={(payload) => emotionalLogService.create(payload)}
+              onLogged={() => setEmotionsLoggedCount((c) => c + 1)}
+            />
+            {emotionsLoggedCount > 0 && (
+              <p className="text-xs text-[#7FB88A] mt-4">
+                {emotionsLoggedCount} emoción{emotionsLoggedCount !== 1 ? "es" : ""} registrada
+                {emotionsLoggedCount !== 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
 
-      <div className="flex items-center justify-between">
-        <Link href="/agenda" className="text-sm text-[#5A6A5A] hover:text-[#C8A96B]">
-          ← Volver a la agenda
-        </Link>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={decidedCount === 0 || submitting}
-          className="bg-[#C8A96B] text-[#0D0D0D] font-semibold px-4 py-2 rounded text-sm hover:bg-[#D4B87A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {submitting ? "Cerrando..." : "Cerrar el día"}
-        </button>
-      </div>
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setStep("agenda")}
+              className="text-sm text-[#5A6A5A] hover:text-[#C8A96B]"
+            >
+              ← Atrás
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep("journal")}
+              className="bg-[#C8A96B] text-[#0D0D0D] font-semibold px-4 py-2 rounded text-sm hover:bg-[#D4B87A] transition-colors"
+            >
+              Siguiente →
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === "journal" && (
+        <>
+          <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-6 space-y-4">
+            {JOURNAL_QUESTIONS.map(({ field, question }) => (
+              <div key={field}>
+                <p className="text-xs text-[#5A6A5A] mb-1.5">{question}</p>
+                <textarea
+                  value={journal[field] ?? ""}
+                  onChange={(e) =>
+                    setJournal((current) => ({ ...current, [field]: e.target.value }))
+                  }
+                  rows={2}
+                  className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded px-3 py-2 text-sm text-[#EAE6DD] placeholder:text-[#5A6A5A] focus:outline-none focus:border-[#C8A96B]/50 resize-none"
+                  placeholder="Opcional"
+                />
+              </div>
+            ))}
+          </div>
+
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setStep("emotional")}
+              className="text-sm text-[#5A6A5A] hover:text-[#C8A96B]"
+            >
+              ← Atrás
+            </button>
+            <button
+              type="button"
+              onClick={handleFinish}
+              disabled={submitting}
+              className="bg-[#C8A96B] text-[#0D0D0D] font-semibold px-4 py-2 rounded text-sm hover:bg-[#D4B87A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? "Cerrando..." : "Cerrar el día"}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
