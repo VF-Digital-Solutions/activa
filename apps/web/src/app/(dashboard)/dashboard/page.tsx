@@ -125,6 +125,13 @@ function IVIHero() {
           <p className="text-[#5A6A5A] text-xs mt-1">Adaptación</p>
         </div>
       </div>
+
+      <Link
+        href="/insight/breakdown"
+        className="inline-block text-sm text-[#C8A96B] hover:underline mt-6"
+      >
+        Ver desglose por capital →
+      </Link>
     </div>
   );
 }
