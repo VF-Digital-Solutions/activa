@@ -2,13 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { isAxiosError } from "axios";
+import Link from "next/link";
 import { timeBlockService } from "@/services/timeBlocks";
 import {
+  blockDateKey,
   ENERGY_TAG_COLOR,
   ENERGY_TAG_LABEL,
   EXISTENTIAL_CATEGORY_COLOR,
   EXISTENTIAL_CATEGORY_LABEL,
   EXISTENTIAL_CATEGORY_ORDER,
+  toDateKey,
 } from "@/lib/agenda";
 import type { EnergyTag, ExistentialCategory, TimeBlock } from "@/types";
 
@@ -22,14 +25,6 @@ function toLocalDatetimeInputValue(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
     date.getHours()
   )}:${pad(date.getMinutes())}`;
-}
-
-function toDateKey(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-CA");
-}
-
-function blockDateKey(block: TimeBlock): string {
-  return toDateKey(block.start_datetime ?? block.created_at);
 }
 
 function startOfWeek(date: Date): Date {
@@ -380,6 +375,9 @@ export default function AgendaPage() {
         >
           {showForm ? "Cancelar" : "+ Nuevo bloque"}
         </button>
+        <Link href="/agenda/day-close" className="text-sm text-[#C8A96B] hover:underline">
+          Cerrar el día →
+        </Link>
       </div>
 
       {showForm && (

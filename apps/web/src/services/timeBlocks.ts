@@ -1,5 +1,12 @@
 import apiClient from "@/lib/api/axios";
-import type { EnergyTag, ExistentialCategory, TimeBlock, TimeBlockStatus } from "@/types";
+import type {
+  DayCloseResolution,
+  DayCloseResult,
+  EnergyTag,
+  ExistentialCategory,
+  TimeBlock,
+  TimeBlockStatus,
+} from "@/types";
 
 export interface CreateTimeBlockPayload {
   title: string;
@@ -20,6 +27,14 @@ export const timeBlockService = {
 
   create: async (payload: CreateTimeBlockPayload): Promise<TimeBlock> => {
     const response = await apiClient.post("/agenda/", payload);
+    return response.data;
+  },
+
+  dayClose: async (
+    date: string,
+    resolutions: DayCloseResolution[]
+  ): Promise<DayCloseResult> => {
+    const response = await apiClient.post("/agenda/day-close/", { date, resolutions });
     return response.data;
   },
 };

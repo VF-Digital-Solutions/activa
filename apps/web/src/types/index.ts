@@ -410,3 +410,34 @@ export interface TimeBlock {
   created_at: string;
   updated_at: string;
 }
+
+export interface DayCloseResolution {
+  block: string;
+  status: "FULFILLED" | "OMITTED";
+  replaced_by?: string;
+}
+
+export interface DailyDistribution {
+  date: string;
+  waking_minutes: number;
+  assigned_minutes: number;
+  unassigned_minutes: number;
+  by_category: Record<ExistentialCategory | "UNASSIGNED", number>;
+  by_energy_tag: Record<EnergyTag | "UNASSIGNED", number>;
+}
+
+export interface CoherenceIndex {
+  date: string;
+  planned_total: number;
+  fulfilled: number;
+  omitted_reassigned: number;
+  omitted_failed: number;
+  still_planned: number;
+  coherence_index: number | null;
+}
+
+export interface DayCloseResult {
+  date: string;
+  distribution: DailyDistribution;
+  coherence: CoherenceIndex;
+}

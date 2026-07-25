@@ -1,4 +1,15 @@
-import type { EnergyTag, ExistentialCategory } from "@/types";
+import type { EnergyTag, ExistentialCategory, TimeBlock } from "@/types";
+
+export function toDateKey(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA");
+}
+
+// Mirrors the backend's retroactive-attribution rule (calculate_daily_distribution):
+// a block belongs to its start_datetime's date, or to its created_at's date
+// if it was logged retroactively with no start_datetime.
+export function blockDateKey(block: TimeBlock): string {
+  return toDateKey(block.start_datetime ?? block.created_at);
+}
 
 export const EXISTENTIAL_CATEGORY_ORDER: ExistentialCategory[] = [
   "OBLIGATIONS",
