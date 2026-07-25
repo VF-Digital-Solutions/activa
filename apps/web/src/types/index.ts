@@ -441,3 +441,28 @@ export interface DayCloseResult {
   distribution: DailyDistribution;
   coherence: CoherenceIndex;
 }
+
+// ── Emotional Capital ────────────────────────────────────────────────────────
+
+export type Emotion =
+  | "JOY"
+  | "GRATITUDE"
+  | "CALM"
+  | "LOVE"
+  | "PRIDE"
+  | "SADNESS"
+  | "ANGER"
+  | "FEAR"
+  | "ANXIETY"
+  | "FRUSTRATION"
+  | "LONELINESS"
+  | "SHAME";
+
+export interface EmotionalLog {
+  id: string;
+  emotion: Emotion;
+  intensity: number;
+  context_note: string;
+  recorded_at: string;
+  created_at: string;
+}
