@@ -113,9 +113,17 @@ export default function AssessmentResultsPage() {
         ))}
       </div>
 
-      <Link href="/assessment" className="text-sm text-[#C8A96B] hover:underline">
-        ← Volver a evaluaciones
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/assessment" className="text-sm text-[#C8A96B] hover:underline">
+          ← Volver a evaluaciones
+        </Link>
+        <Link
+          href={`/assessment/${params.type}/history`}
+          className="text-sm text-[#C8A96B] hover:underline"
+        >
+          Ver historial →
+        </Link>
+      </div>
     </div>
   );
 }
