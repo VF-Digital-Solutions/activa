@@ -38,3 +38,17 @@ export const CAPITAL_DIMENSION_ORDER: CapitalDimension[] = [
   "TRANSCENDENTAL",
   "STRENGTHS",
 ];
+
+// Fixed categorical order (never cycled/reassigned), first 7 slots of the
+// dataviz skill's validated 8-hue dark-mode theme — passes CVD + normal-vision
+// separation checks for adjacent line series against this app's #111111
+// surface (validated via scripts/validate_palette.js).
+export const CAPITAL_DIMENSION_COLOR: Record<CapitalDimension, string> = {
+  PHYSICAL: "#3987e5",
+  EMOTIONAL: "#d95926",
+  RELATIONAL: "#199e70",
+  COGNITIVE: "#c98500",
+  MORAL: "#d55181",
+  TRANSCENDENTAL: "#008300",
+  STRENGTHS: "#9085e9",
+};

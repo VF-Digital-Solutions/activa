@@ -126,12 +126,14 @@ function IVIHero() {
         </div>
       </div>
 
-      <Link
-        href="/insight/breakdown"
-        className="inline-block text-sm text-[#C8A96B] hover:underline mt-6"
-      >
-        Ver desglose por capital →
-      </Link>
+      <div className="flex items-center justify-center gap-4 mt-6">
+        <Link href="/insight/breakdown" className="text-sm text-[#C8A96B] hover:underline">
+          Ver desglose por capital →
+        </Link>
+        <Link href="/insight/history" className="text-sm text-[#C8A96B] hover:underline">
+          Ver historial →
+        </Link>
+      </div>
     </div>
   );
 }
