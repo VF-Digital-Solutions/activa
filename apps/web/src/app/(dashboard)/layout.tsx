@@ -54,6 +54,7 @@ export default function DashboardLayout({
           {[
             { label: "Dashboard", href: "/dashboard" },
             { label: "Evaluación", href: "/assessment" },
+            { label: "Agenda", href: "/agenda" },
             // Disabled for Activa MVP (2026-07-23): HomeTrack household-management
             // modules, not used in the current Activa scope. Routes kept in place
             // (renamed with "_" prefix), not deleted.
@@ -61,7 +62,6 @@ export default function DashboardLayout({
             // { label: "Activos", href: "/assets" },
             // { label: "Finanzas", href: "/finances" },
             // { label: "Rutinas", href: "/routines" },
-            // { label: "Agenda", href: "/agenda" },
             // { label: "Beneficios", href: "/benefits" },
           ].map((item) => (
             <Link
@@ -100,11 +100,11 @@ export default function DashboardLayout({
         {[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Evaluación", href: "/assessment" },
+          { label: "Agenda", href: "/agenda" },
           // Disabled for Activa MVP (2026-07-23): see sidebar nav above.
           // { label: "Activos", href: "/assets" },
           // { label: "Finanzas", href: "/finances" },
           // { label: "Rutinas", href: "/routines" },
-          // { label: "Agenda", href: "/agenda" },
         ].map((item) => (
           <Link
             key={item.href}

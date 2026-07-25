@@ -385,3 +385,28 @@ export interface AssessmentEvolution {
   baseline: AssessmentSnapshot | null;
   evolution: AssessmentEvolutionEntry[];
 }
+
+// ── Existential Agenda (TimeBlock) ──────────────────────────────────────────
+
+export type ExistentialCategory =
+  | "OBLIGATIONS"
+  | "INNER_NOURISHMENT"
+  | "BONDS"
+  | "TRANSCENDENCE";
+
+export type EnergyTag = "ENERGIZES" | "NEUTRAL" | "DRAINS";
+
+export type TimeBlockStatus = "PLANNED" | "FULFILLED" | "OMITTED";
+
+export interface TimeBlock {
+  id: string;
+  title: string;
+  existential_category: ExistentialCategory;
+  energy_tag: EnergyTag;
+  duration_minutes: number;
+  start_datetime: string | null;
+  status: TimeBlockStatus;
+  replaced_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
