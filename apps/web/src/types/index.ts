@@ -318,3 +318,191 @@ export interface AgendaItem {
   color: string | null;
   metadata: Record<string, unknown>;
 }
+
+// ── Assessment ───────────────────────────────────────────────────────────────
+
+export type AssessmentType = "AUDIT_7_AREAS" | "HEALTH_SCALE_10";
+
+export type CapitalDimension =
+  | "PHYSICAL"
+  | "EMOTIONAL"
+  | "RELATIONAL"
+  | "COGNITIVE"
+  | "MORAL"
+  | "TRANSCENDENTAL"
+  | "STRENGTHS";
+
+export type ScaleType = "SCALE_1_10";
+
+export type AssessmentAttemptStatus = "IN_PROGRESS" | "COMPLETED";
+
+export interface AssessmentQuestion {
+  id: string;
+  order: number;
+  text: string;
+  capital_dimension: CapitalDimension;
+  scale_type: ScaleType;
+}
+
+export interface Assessment {
+  id: string;
+  type: AssessmentType;
+  version: number;
+  title: string;
+  description: string;
+  questions: AssessmentQuestion[];
+}
+
+export interface AssessmentAttempt {
+  id: string;
+  assessment: Assessment;
+  status: AssessmentAttemptStatus;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface AssessmentResponseRecord {
+  id: string;
+  question: string;
+  score: number;
+  created_at: string;
+}
+
+export interface AssessmentSnapshot {
+  id: string;
+  attempt: string;
+  snapshot_date: string;
+  scores_by_dimension: Record<string, number>;
+}
+
+export interface AssessmentEvolutionEntry {
+  snapshot_date: string;
+  scores_by_dimension: Record<string, number>;
+  deltas: Record<string, number>;
+}
+
+export interface AssessmentEvolution {
+  baseline: AssessmentSnapshot | null;
+  evolution: AssessmentEvolutionEntry[];
+}
+
+// ── Existential Agenda (TimeBlock) ──────────────────────────────────────────
+
+export type ExistentialCategory =
+  | "OBLIGATIONS"
+  | "INNER_NOURISHMENT"
+  | "BONDS"
+  | "TRANSCENDENCE";
+
+export type EnergyTag = "ENERGIZES" | "NEUTRAL" | "DRAINS";
+
+export type TimeBlockStatus = "PLANNED" | "FULFILLED" | "OMITTED";
+
+export interface TimeBlock {
+  id: string;
+  title: string;
+  existential_category: ExistentialCategory;
+  energy_tag: EnergyTag;
+  duration_minutes: number;
+  start_datetime: string | null;
+  status: TimeBlockStatus;
+  replaced_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DayCloseResolution {
+  block: string;
+  status: "FULFILLED" | "OMITTED";
+  replaced_by?: string;
+}
+
+export interface DailyDistribution {
+  date: string;
+  waking_minutes: number;
+  assigned_minutes: number;
+  unassigned_minutes: number;
+  by_category: Record<ExistentialCategory | "UNASSIGNED", number>;
+  by_energy_tag: Record<EnergyTag | "UNASSIGNED", number>;
+}
+
+export interface CoherenceIndex {
+  date: string;
+  planned_total: number;
+  fulfilled: number;
+  omitted_reassigned: number;
+  omitted_failed: number;
+  still_planned: number;
+  coherence_index: number | null;
+}
+
+export interface DayCloseResult {
+  date: string;
+  distribution: DailyDistribution;
+  coherence: CoherenceIndex;
+}
+
+// ── Emotional Capital ────────────────────────────────────────────────────────
+
+export type Emotion =
+  | "JOY"
+  | "GRATITUDE"
+  | "CALM"
+  | "LOVE"
+  | "PRIDE"
+  | "SADNESS"
+  | "ANGER"
+  | "FEAR"
+  | "ANXIETY"
+  | "FRUSTRATION"
+  | "LONELINESS"
+  | "SHAME";
+
+export interface EmotionalLog {
+  id: string;
+  emotion: Emotion;
+  intensity: number;
+  context_note: string;
+  recorded_at: string;
+  created_at: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  energy_gain: string;
+  energy_drain: string;
+  avoided_conversation: string;
+  attention_needed: string;
+  gratitude: string;
+  recorded_at: string;
+  created_at: string;
+}
+
+export type TrendDirection = "IMPROVING" | "DECLINING" | "STABLE" | "INSUFFICIENT_DATA";
+
+export interface EmotionCount {
+  emotion: Emotion;
+  count: number;
+}
+
+export interface EmotionalAggregates {
+  window_days: number;
+  start_date: string;
+  end_date: string;
+  total_entries: number;
+  average_intensity: number | null;
+  emotion_counts: EmotionCount[];
+  dominant_emotions: Emotion[];
+  trend_direction: TrendDirection;
+}
+
+// ── Insight (IVI) ─────────────────────────────────────────────────────────────
+
+export interface IVISnapshot {
+  snapshot_date: string;
+  ivi: number;
+  assets: number;
+  liabilities: number;
+  adaptation: number;
+  assets_by_dimension: Record<string, number>;
+}

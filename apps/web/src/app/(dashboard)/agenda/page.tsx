@@ -1,854 +1,456 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { agendaService } from "@/services/agenda";
-import { useAuthStore } from "@/store/auth";
-import type { AgendaItem, AgendaEvent, AgendaEventType } from "@/types";
+import { useEffect, useMemo, useState } from "react";
+import { isAxiosError } from "axios";
+import Link from "next/link";
+import { timeBlockService } from "@/services/timeBlocks";
+import {
+  addUtcDays,
+  blockDateKey,
+  ENERGY_TAG_COLOR,
+  ENERGY_TAG_LABEL,
+  ENERGY_TAG_ORDER,
+  EXISTENTIAL_CATEGORY_COLOR,
+  EXISTENTIAL_CATEGORY_LABEL,
+  EXISTENTIAL_CATEGORY_ORDER,
+  formatUtcDate,
+  toDateKey,
+  todayUtc,
+} from "@/lib/agenda";
+import type { EnergyTag, ExistentialCategory, TimeBlock } from "@/types";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+type ViewMode = "day" | "week";
+type LogMode = "planned" | "retroactive";
 
-const SOURCE_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  reservation: { label: "Reserva", color: "#C8A96B", icon: "●" },
-  task: { label: "Tarea", color: "#6B8FC8", icon: "•" },
-  habit: { label: "Hábito", color: "#6BC88F", icon: "★" },
-  event: { label: "Evento", color: "#A96BC8", icon: "◆" },
-  reminder: { label: "Recordatorio", color: "#C86B6B", icon: "🔔" },
-};
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+function toLocalDatetimeInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`;
 }
 
-function formatDayHeader(iso: string): string {
-  return new Date(iso).toLocaleDateString("es", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
+// UTC-anchored: mirrors the backend's UTC date-bucketing, see lib/agenda.ts.
+function startOfWeek(date: Date): Date {
+  const day = date.getUTCDay();
+  const diff = (day + 6) % 7; // Monday = 0
+  return addUtcDays(date, -diff);
+}
+
+const WEEKDAY_LABEL = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+function formatBlockTime(block: TimeBlock): string {
+  if (!block.start_datetime) return "Sin horario";
+  return new Date(block.start_datetime).toLocaleTimeString("es", {
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
-function formatItemTime(item: AgendaItem): string {
-  if (item.is_all_day) return "Todo el día";
-  const start = new Date(item.starts_at).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
-  if (!item.ends_at) return start;
-  const end = new Date(item.ends_at).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
-  return `${start} – ${end}`;
-}
-
-function toDateKey(iso: string): string {
-  return iso.slice(0, 10);
-}
-
-function groupByDay(items: AgendaItem[]): Record<string, AgendaItem[]> {
-  return items.reduce<Record<string, AgendaItem[]>>((acc, item) => {
-    const key = toDateKey(item.starts_at);
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(item);
-    return acc;
-  }, {});
-}
-
-function getDaysInMonth(year: number, month: number): Date[] {
-  const days: Date[] = [];
-  const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0);
-  for (let d = 1; d <= last.getDate(); d++) {
-    days.push(new Date(year, month, d));
-  }
-  // Pad with nulls at the beginning for weekday alignment (Monday start)
-  const _ = days;
-  return _;
-}
-
-// ── Form schema ───────────────────────────────────────────────────────────────
-
-const eventSchema = z.object({
-  title: z.string().min(1, "El título es requerido"),
-  event_type: z.enum(["PERSONAL", "HOUSEHOLD", "REMINDER"] as const),
-  starts_at: z.string().min(1, "La fecha y hora de inicio son requeridas"),
-  ends_at: z.string().optional(),
-  description: z.string().optional(),
-  is_all_day: z.boolean().optional(),
-  color: z.string().optional(),
-});
-
-type EventFormData = z.infer<typeof eventSchema>;
-
-// ── Components ────────────────────────────────────────────────────────────────
-
-function AgendaItemCard({ item, onEdit }: { item: AgendaItem; onEdit?: (item: AgendaItem) => void }) {
-  const { user } = useAuthStore();
-  const cfg = SOURCE_CONFIG[item.source] ?? { label: item.source, color: "#888", icon: "○" };
-  const isEditable =
-    onEdit &&
-    (item.source === "event" || item.source === "reminder") &&
-    user?.id === (item.metadata?.created_by as string | undefined);
-
-  return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-[#111111] border border-[#2A2A2A] hover:border-[#3A3A3A] transition-colors">
-      <span className="text-lg mt-0.5" style={{ color: cfg.color }}>
-        {cfg.icon}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium text-[#EAE6DD] truncate">{item.title}</p>
-          <div className="flex items-center gap-2 shrink-0">
-            {item.status && (
-              <span className="text-xs text-[#5A6A5A]">{item.status}</span>
-            )}
-            {isEditable && (
-              <button
-                onClick={() => onEdit(item)}
-                className="text-xs text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
-              >
-                Editar
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          {!item.is_all_day && (
-            <span className="text-xs text-[#5A6A5A]">{formatTime(item.starts_at)}</span>
-          )}
-          {item.is_all_day && (
-            <span className="text-xs text-[#5A6A5A]">Todo el día</span>
-          )}
-          <span
-            className="text-xs px-1.5 py-0.5 rounded"
-            style={{ backgroundColor: `${cfg.color}22`, color: cfg.color }}
-          >
-            {cfg.label}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ListView({ items, onEditItem }: { items: AgendaItem[]; onEditItem: (item: AgendaItem) => void }) {
-  if (items.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-[#5A6A5A]">
-        <p className="text-4xl mb-3">📅</p>
-        <p className="text-sm">No hay eventos en este período</p>
-      </div>
-    );
-  }
-
-  const grouped = groupByDay(items);
-  const sortedDays = Object.keys(grouped).sort();
-
-  return (
-    <div className="space-y-6">
-      {sortedDays.map((day) => (
-        <div key={day}>
-          <h3 className="text-xs uppercase tracking-wider text-[#5A6A5A] mb-3 font-medium capitalize">
-            {formatDayHeader(day + "T00:00:00")}
-          </h3>
-          <div className="space-y-2">
-            {grouped[day].map((item) => (
-              <AgendaItemCard key={`${item.source}-${item.source_id}`} item={item} onEdit={onEditItem} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function CalendarView({
-  items,
-  year,
-  month,
-  onMonthChange,
-  onEditItem,
-}: {
-  items: AgendaItem[];
-  year: number;
-  month: number;
-  onMonthChange: (year: number, month: number) => void;
-  onEditItem: (item: AgendaItem) => void;
-}) {
-  const [dayModalDate, setDayModalDate] = useState<string | null>(null);
-
-  const itemsByDay = useMemo(() => {
-    const map: Record<string, AgendaItem[]> = {};
-    items.forEach((item) => {
-      const key = toDateKey(item.starts_at);
-      if (!map[key]) map[key] = [];
-      map[key].push(item);
-    });
-    return map;
-  }, [items]);
-
-  const firstDayOfMonth = new Date(year, month, 1);
-  // Monday = 0 offset
-  const startOffset = (firstDayOfMonth.getDay() + 6) % 7;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const monthName = firstDayOfMonth.toLocaleDateString("es", { month: "long", year: "numeric" });
-
-  const prevMonth = () => {
-    if (month === 0) onMonthChange(year - 1, 11);
-    else onMonthChange(year, month - 1);
-  };
-  const nextMonth = () => {
-    if (month === 11) onMonthChange(year + 1, 0);
-    else onMonthChange(year, month + 1);
-  };
-
-  return (
-    <div>
-      {/* Calendar header */}
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={prevMonth}
-          className="p-2 text-[#5A6A5A] hover:text-[#EAE6DD] transition-colors"
-        >
-          ‹
-        </button>
-        <span className="text-sm font-medium text-[#EAE6DD] capitalize">{monthName}</span>
-        <button
-          onClick={nextMonth}
-          className="p-2 text-[#5A6A5A] hover:text-[#EAE6DD] transition-colors"
-        >
-          ›
-        </button>
-      </div>
-
-      {/* Day labels */}
-      <div className="grid grid-cols-7 mb-2">
-        {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((d) => (
-          <div key={d} className="text-center text-xs text-[#5A6A5A] py-1">
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* Day cells */}
-      <div className="grid grid-cols-7 gap-1">
-        {Array.from({ length: startOffset }).map((_, i) => (
-          <div key={`empty-${i}`} />
-        ))}
-        {Array.from({ length: daysInMonth }, (_, i) => {
-          const day = i + 1;
-          const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const dayItems = itemsByDay[dateKey] ?? [];
-          const isToday = dateKey === toDateKey(new Date().toISOString());
-
-          return (
-            <button
-              key={dateKey}
-              onClick={() => setDayModalDate(dateKey)}
-              className={`
-                min-h-[3.5rem] rounded-lg flex flex-col items-start justify-start p-1 text-xs transition-colors w-full
-                hover:bg-[#1A1A1A] text-[#EAE6DD]
-                ${isToday ? "ring-1 ring-[#C8A96B]" : ""}
-              `}
-            >
-              <span className="font-medium w-full text-center">{day}</span>
-              {dayItems.length > 0 && (
-                <div className="flex flex-col gap-0.5 w-full mt-0.5">
-                  {dayItems.slice(0, 2).map((item, idx) => {
-                    const cfg = SOURCE_CONFIG[item.source];
-                    return (
-                      <div key={idx} className="relative group flex items-center gap-0.5 w-full">
-                        <span
-                          className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ backgroundColor: cfg?.color ?? "#888" }}
-                        />
-                        <span className="truncate text-[10px] leading-tight text-[#B0A898]">
-                          {formatItemTime(item)} {item.title}
-                        </span>
-                        <div className="absolute bottom-full left-0 mb-1.5 z-[200] invisible group-hover:visible pointer-events-none w-max max-w-[220px]">
-                          <div className="bg-[#1C1C1C] border border-[#3A3A3A] rounded-lg p-2.5 shadow-2xl">
-                            <p className="text-xs font-medium text-[#EAE6DD] leading-snug">{item.title}</p>
-                            <p className="text-[10px] text-[#5A6A5A] mt-1">{formatItemTime(item)}</p>
-                            <span
-                              className="text-[10px] px-1.5 py-0.5 rounded mt-1.5 inline-block"
-                              style={{ backgroundColor: `${cfg?.color ?? "#888"}22`, color: cfg?.color ?? "#888" }}
-                            >
-                              {cfg?.label ?? item.source}
-                            </span>
-                          </div>
-                          <div className="w-2 h-2 bg-[#1C1C1C] border-r border-b border-[#3A3A3A] rotate-45 ml-2 -mt-1" />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {dayItems.length > 2 && (
-                    <span className="text-[10px] text-[#5A6A5A] pl-2">+{dayItems.length - 2} más</span>
-                  )}
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {dayModalDate && (
-        <DayEventsModal
-          date={dayModalDate}
-          items={itemsByDay[dayModalDate] ?? []}
-          onClose={() => setDayModalDate(null)}
-          onEditItem={(item) => {
-            setDayModalDate(null);
-            onEditItem(item);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function DayEventsModal({
-  date,
-  items,
-  onClose,
-  onEditItem,
-}: {
-  date: string;
-  items: AgendaItem[];
-  onClose: () => void;
-  onEditItem: (item: AgendaItem) => void;
-}) {
-  const { user } = useAuthStore();
-  const title = new Date(date + "T00:00:00").toLocaleDateString("es", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+function TimeBlockCard({ block }: { block: TimeBlock }) {
+  const energyColor = ENERGY_TAG_COLOR[block.energy_tag];
+  const categoryColor = EXISTENTIAL_CATEGORY_COLOR[block.existential_category];
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
+      className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg p-3 border-l-4"
+      style={{ borderLeftColor: categoryColor }}
     >
-      <div
-        className="bg-[#111111] border border-[#2A2A2A] rounded-xl w-full max-w-md max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between p-5 border-b border-[#2A2A2A]">
-          <h2 className="text-base font-semibold text-[#EAE6DD] capitalize">{title}</h2>
-          <button
-            onClick={onClose}
-            className="text-[#5A6A5A] hover:text-[#EAE6DD] transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-        <div className="p-4 overflow-y-auto space-y-2">
-          {items.length === 0 ? (
-            <p className="text-sm text-[#5A6A5A] text-center py-6">Sin eventos este día</p>
-          ) : (
-            items.map((item) => {
-              const cfg = SOURCE_CONFIG[item.source] ?? { label: item.source, color: "#888", icon: "○" };
-              const isEditable =
-                (item.source === "event" || item.source === "reminder") &&
-                user?.id === (item.metadata?.created_by as string | undefined);
-              return (
-                <div
-                  key={`${item.source}-${item.source_id}`}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-[#0D0D0D] border border-[#2A2A2A]"
-                >
-                  <span
-                    className="w-2 h-2 rounded-full mt-1.5 shrink-0"
-                    style={{ backgroundColor: cfg.color }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-[#EAE6DD]">{item.title}</p>
-                      {isEditable && (
-                        <button
-                          onClick={() => onEditItem(item)}
-                          className="text-xs text-[#5A6A5A] hover:text-[#C8A96B] transition-colors shrink-0"
-                        >
-                          Editar
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-xs text-[#5A6A5A]">{formatItemTime(item)}</span>
-                      <span
-                        className="text-xs px-1.5 py-0.5 rounded"
-                        style={{ backgroundColor: `${cfg.color}22`, color: cfg.color }}
-                      >
-                        {cfg.label}
-                      </span>
-                      {item.status && (
-                        <span className="text-xs text-[#5A6A5A]">{item.status}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-[#EAE6DD] font-medium truncate">{block.title}</p>
+        <span
+          className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0"
+          style={{ color: energyColor, backgroundColor: `${energyColor}22` }}
+        >
+          {ENERGY_TAG_LABEL[block.energy_tag]}
+        </span>
+      </div>
+      <div className="flex items-center justify-between mt-1.5 text-xs">
+        <span style={{ color: categoryColor }}>
+          {EXISTENTIAL_CATEGORY_LABEL[block.existential_category]}
+        </span>
+        <span className="text-[#5A6A5A]">
+          {formatBlockTime(block)} · {block.duration_minutes} min
+        </span>
       </div>
     </div>
   );
 }
 
-function EditEventModal({
-  item,
-  onClose,
-  onUpdated,
+function NewTimeBlockForm({
+  defaultDate,
+  onCreated,
+  onCancel,
 }: {
-  item: AgendaItem;
-  onClose: () => void;
-  onUpdated: () => void;
+  defaultDate: Date;
+  onCreated: (block: TimeBlock) => void;
+  onCancel: () => void;
 }) {
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState<ExistentialCategory | null>(null);
+  const [energyTag, setEnergyTag] = useState<EnergyTag | null>(null);
+  const [durationMinutes, setDurationMinutes] = useState("30");
+  const [mode, setMode] = useState<LogMode>("planned");
+  const [startDatetime, setStartDatetime] = useState(() =>
+    toLocalDatetimeInputValue(defaultDate)
+  );
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fullEvent, setFullEvent] = useState<AgendaEvent | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<EventFormData>({
-    resolver: zodResolver(eventSchema),
-    defaultValues: { event_type: "PERSONAL", is_all_day: false },
-  });
+  const isValid =
+    title.trim().length > 0 &&
+    category !== null &&
+    energyTag !== null &&
+    Number(durationMinutes) > 0;
 
-  useEffect(() => {
-    agendaService.getEvent(String(item.source_id)).then((event) => {
-      setFullEvent(event);
-      reset({
-        title: event.title,
-        event_type: event.event_type,
-        starts_at: event.starts_at.slice(0, 16),
-        ends_at: event.ends_at ? event.ends_at.slice(0, 16) : undefined,
-        description: event.description ?? undefined,
-        is_all_day: event.is_all_day,
-        color: event.color ?? undefined,
-      });
-      setIsLoading(false);
-    }).catch(() => {
-      setError("No se pudo cargar el evento.");
-      setIsLoading(false);
-    });
-  }, [item.source_id, reset]);
+  const handleSubmit = async () => {
+    if (!isValid || !category || !energyTag) return;
 
-  const onSubmit = async (data: EventFormData) => {
-    if (!fullEvent) return;
-    setIsSubmitting(true);
+    setSubmitting(true);
     setError(null);
     try {
-      await agendaService.updateEvent(fullEvent.id, {
-        ...data,
-        ends_at: data.ends_at || null,
+      const block = await timeBlockService.create({
+        title: title.trim(),
+        existential_category: category,
+        energy_tag: energyTag,
+        duration_minutes: Number(durationMinutes),
+        ...(mode === "planned"
+          ? { start_datetime: new Date(startDatetime).toISOString() }
+          : { status: "FULFILLED" }),
       });
-      onUpdated();
-      onClose();
-    } catch {
-      setError("No se pudo guardar los cambios. Intenta de nuevo.");
+      onCreated(block);
+    } catch (err) {
+      if (isAxiosError(err)) {
+        setError("No se pudo guardar el bloque. Revisa los datos e intenta de nuevo.");
+      } else {
+        setError("Ocurrió un error inesperado.");
+      }
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#111111] border border-[#2A2A2A] rounded-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-5 border-b border-[#2A2A2A]">
-          <h2 className="text-base font-semibold text-[#EAE6DD]">Editar evento</h2>
-          <button
-            onClick={onClose}
-            className="text-[#5A6A5A] hover:text-[#EAE6DD] transition-colors"
-          >
-            ✕
-          </button>
-        </div>
+    <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-6 space-y-4">
+      <div className="flex items-center bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg p-1 w-fit">
+        <button
+          type="button"
+          onClick={() => setMode("planned")}
+          className={`px-3 py-1.5 text-sm rounded ${
+            mode === "planned"
+              ? "bg-[#C8A96B] text-[#0D0D0D]"
+              : "text-[#5A6A5A] hover:text-[#EAE6DD]"
+          }`}
+        >
+          Planificar
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("retroactive")}
+          className={`px-3 py-1.5 text-sm rounded ${
+            mode === "retroactive"
+              ? "bg-[#C8A96B] text-[#0D0D0D]"
+              : "text-[#5A6A5A] hover:text-[#EAE6DD]"
+          }`}
+        >
+          Ya lo viví
+        </button>
+      </div>
 
-        {isLoading ? (
-          <div className="flex justify-center py-10">
-            <div className="w-5 h-5 border-2 border-[#C8A96B] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
-            <div>
-              <label className="block text-xs text-[#5A6A5A] mb-1">Título *</label>
-              <input
-                {...register("title")}
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]"
-              />
-              {errors.title && (
-                <p className="text-xs text-red-400 mt-1">{errors.title.message}</p>
-              )}
-            </div>
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="¿Qué hiciste o vas a hacer?"
+        className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded px-3 py-2 text-sm text-[#EAE6DD] placeholder:text-[#5A6A5A] focus:outline-none focus:border-[#C8A96B]/50"
+      />
 
-            <div>
-              <label className="block text-xs text-[#5A6A5A] mb-1">Tipo</label>
-              <select
-                {...register("event_type")}
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]"
-              >
-                <option value="PERSONAL">Personal</option>
-                <option value="HOUSEHOLD">Del hogar</option>
-                <option value="REMINDER">Recordatorio</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-[#5A6A5A] mb-1">Inicio *</label>
-                <input
-                  {...register("starts_at")}
-                  type="datetime-local"
-                  className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]"
-                />
-                {errors.starts_at && (
-                  <p className="text-xs text-red-400 mt-1">{errors.starts_at.message}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs text-[#5A6A5A] mb-1">Fin</label>
-                <input
-                  {...register("ends_at")}
-                  type="datetime-local"
-                  className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs text-[#5A6A5A] mb-1">Descripción</label>
-              <textarea
-                {...register("description")}
-                rows={3}
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B] resize-none"
-              />
-            </div>
-
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                {...register("is_all_day")}
-                type="checkbox"
-                className="accent-[#C8A96B]"
-              />
-              <span className="text-sm text-[#EAE6DD]">Todo el día</span>
-            </label>
-
-            {error && <p className="text-sm text-red-400">{error}</p>}
-
-            <div className="flex gap-3 pt-2">
+      <div>
+        <p className="text-xs text-[#5A6A5A] uppercase tracking-wide mb-2">Categoría</p>
+        <div className="grid grid-cols-2 gap-2">
+          {EXISTENTIAL_CATEGORY_ORDER.map((value) => {
+            const color = EXISTENTIAL_CATEGORY_COLOR[value];
+            const selected = category === value;
+            return (
               <button
+                key={value}
                 type="button"
-                onClick={onClose}
-                className="flex-1 py-2 rounded-lg border border-[#2A2A2A] text-sm text-[#5A6A5A] hover:text-[#EAE6DD] transition-colors"
+                onClick={() => setCategory(value)}
+                className="text-xs px-3 py-2 rounded border text-left transition-colors"
+                style={{
+                  borderColor: selected ? color : "#2A2A2A",
+                  backgroundColor: selected ? `${color}22` : "transparent",
+                  color: selected ? color : "#5A6A5A",
+                }}
               >
-                Cancelar
+                {EXISTENTIAL_CATEGORY_LABEL[value]}
               </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs text-[#5A6A5A] uppercase tracking-wide mb-2">Energía</p>
+        <div className="flex gap-2">
+          {ENERGY_TAG_ORDER.map((value) => {
+            const color = ENERGY_TAG_COLOR[value];
+            const selected = energyTag === value;
+            return (
               <button
-                type="submit"
-                disabled={isSubmitting}
-                className="flex-1 py-2 rounded-lg bg-[#C8A96B] text-[#0D0D0D] text-sm font-medium hover:bg-[#D4B87A] disabled:opacity-50 transition-colors"
+                key={value}
+                type="button"
+                onClick={() => setEnergyTag(value)}
+                className="text-xs px-3 py-2 rounded border transition-colors"
+                style={{
+                  borderColor: selected ? color : "#2A2A2A",
+                  backgroundColor: selected ? `${color}22` : "transparent",
+                  color: selected ? color : "#5A6A5A",
+                }}
               >
-                {isSubmitting ? "Guardando..." : "Guardar cambios"}
+                {ENERGY_TAG_LABEL[value]}
               </button>
-            </div>
-          </form>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex items-end gap-3">
+        <div className="flex-1">
+          <p className="text-xs text-[#5A6A5A] uppercase tracking-wide mb-2">
+            Duración (min)
+          </p>
+          <input
+            type="number"
+            min={1}
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(e.target.value)}
+            className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]/50"
+          />
+        </div>
+        {mode === "planned" && (
+          <div className="flex-1">
+            <p className="text-xs text-[#5A6A5A] uppercase tracking-wide mb-2">Cuándo</p>
+            <input
+              type="datetime-local"
+              value={startDatetime}
+              onChange={(e) => setStartDatetime(e.target.value)}
+              className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]/50"
+            />
+          </div>
         )}
       </div>
-    </div>
-  );
-}
 
-function CreateEventModal({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+      {error && <p className="text-red-400 text-xs">{error}</p>}
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<EventFormData>({
-    resolver: zodResolver(eventSchema),
-    defaultValues: { event_type: "PERSONAL", is_all_day: false },
-  });
-
-  const onSubmit = async (data: EventFormData) => {
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await agendaService.createEvent({
-        ...data,
-        ends_at: data.ends_at || null,
-      });
-      onCreated();
-      onClose();
-    } catch {
-      setError("No se pudo crear el evento. Intenta de nuevo.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#111111] border border-[#2A2A2A] rounded-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-5 border-b border-[#2A2A2A]">
-          <h2 className="text-base font-semibold text-[#EAE6DD]">Nuevo evento</h2>
-          <button
-            onClick={onClose}
-            className="text-[#5A6A5A] hover:text-[#EAE6DD] transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs text-[#5A6A5A] mb-1">Título *</label>
-            <input
-              {...register("title")}
-              className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]"
-              placeholder="Nombre del evento"
-            />
-            {errors.title && (
-              <p className="text-xs text-red-400 mt-1">{errors.title.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-xs text-[#5A6A5A] mb-1">Tipo</label>
-            <select
-              {...register("event_type")}
-              className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]"
-            >
-              <option value="PERSONAL">Personal</option>
-              <option value="HOUSEHOLD">Del hogar</option>
-              <option value="REMINDER">Recordatorio</option>
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-[#5A6A5A] mb-1">Inicio *</label>
-              <input
-                {...register("starts_at")}
-                type="datetime-local"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]"
-              />
-              {errors.starts_at && (
-                <p className="text-xs text-red-400 mt-1">{errors.starts_at.message}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs text-[#5A6A5A] mb-1">Fin</label>
-              <input
-                {...register("ends_at")}
-                type="datetime-local"
-                className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B]"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-[#5A6A5A] mb-1">Descripción</label>
-            <textarea
-              {...register("description")}
-              rows={3}
-              className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg px-3 py-2 text-sm text-[#EAE6DD] focus:outline-none focus:border-[#C8A96B] resize-none"
-              placeholder="Descripción opcional"
-            />
-          </div>
-
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              {...register("is_all_day")}
-              type="checkbox"
-              className="accent-[#C8A96B]"
-            />
-            <span className="text-sm text-[#EAE6DD]">Todo el día</span>
-          </label>
-
-          {error && <p className="text-sm text-red-400">{error}</p>}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-2 rounded-lg border border-[#2A2A2A] text-sm text-[#5A6A5A] hover:text-[#EAE6DD] transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 py-2 rounded-lg bg-[#C8A96B] text-[#0D0D0D] text-sm font-medium hover:bg-[#D4B87A] disabled:opacity-50 transition-colors"
-            >
-              {isSubmitting ? "Creando..." : "Crear evento"}
-            </button>
-          </div>
-        </form>
+      <div className="flex items-center justify-end gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-sm text-[#5A6A5A] hover:text-[#EAE6DD] transition-colors"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={!isValid || submitting}
+          className="bg-[#C8A96B] text-[#0D0D0D] font-semibold px-4 py-2 rounded text-sm hover:bg-[#D4B87A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {submitting ? "Guardando..." : "Guardar"}
+        </button>
       </div>
     </div>
   );
 }
-
-// ── Page ──────────────────────────────────────────────────────────────────────
-
-type ViewMode = "list" | "calendar";
-type FilterKey = "reservation" | "task" | "habit" | "event" | "reminder";
-
-const FILTER_OPTIONS: { key: FilterKey; label: string; color: string }[] = [
-  { key: "reservation", label: "Reservas", color: "#C8A96B" },
-  { key: "task", label: "Tareas", color: "#6B8FC8" },
-  { key: "habit", label: "Hábitos", color: "#6BC88F" },
-  { key: "event", label: "Eventos", color: "#A96BC8" },
-  { key: "reminder", label: "Recordatorios", color: "#C86B6B" },
-];
 
 export default function AgendaPage() {
-  const now = new Date();
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [activeFilters, setActiveFilters] = useState<Record<FilterKey, boolean>>({
-    reservation: true,
-    task: true,
-    habit: true,
-    event: true,
-    reminder: true,
-  });
-  const [calYear, setCalYear] = useState(now.getFullYear());
-  const [calMonth, setCalMonth] = useState(now.getMonth());
-  const [items, setItems] = useState<AgendaItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<AgendaItem | null>(null);
-
-  const activeTypes = Object.entries(activeFilters)
-    .filter(([, v]) => v)
-    .map(([k]) => k);
-
-  const fetchItems = async () => {
-    setIsLoading(true);
-    try {
-      const from = new Date(calYear, calMonth, 1).toISOString();
-      const to = new Date(calYear, calMonth + 1, 0, 23, 59, 59).toISOString();
-      const data = await agendaService.getItems({ from, to, types: activeTypes });
-      setItems(data);
-    } catch {
-      setItems([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [blocks, setBlocks] = useState<TimeBlock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("day");
+  const [showForm, setShowForm] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(todayUtc);
 
   useEffect(() => {
-    fetchItems();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calYear, calMonth, JSON.stringify(activeFilters)]);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
 
-  const visibleItems = items.filter((item) => activeFilters[item.source as FilterKey]);
+    timeBlockService
+      .list()
+      .then((data) => {
+        if (!cancelled) setBlocks(data);
+      })
+      .catch(() => {
+        if (!cancelled) setError("No se pudieron cargar tus bloques de tiempo.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-  const toggleFilter = (key: FilterKey) => {
-    setActiveFilters((prev) => ({ ...prev, [key]: !prev[key] }));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const blocksByDate = useMemo(() => {
+    const map = new Map<string, TimeBlock[]>();
+    for (const block of blocks) {
+      const key = blockDateKey(block);
+      const existing = map.get(key) ?? [];
+      existing.push(block);
+      map.set(key, existing);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) =>
+        (a.start_datetime ?? a.created_at).localeCompare(b.start_datetime ?? b.created_at)
+      );
+    }
+    return map;
+  }, [blocks]);
+
+  const weekStart = useMemo(() => startOfWeek(selectedDate), [selectedDate]);
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addUtcDays(weekStart, i)),
+    [weekStart]
+  );
+
+  const selectedKey = toDateKey(selectedDate);
+  const dayBlocks = blocksByDate.get(selectedKey) ?? [];
+
+  const shiftDate = (deltaDays: number) => {
+    setSelectedDate((current) => addUtcDays(current, deltaDays));
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-[#EAE6DD] tracking-wide">Agenda</h1>
-        <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <div className="flex bg-[#111111] border border-[#2A2A2A] rounded-lg p-0.5">
-            {(["list", "calendar"] as ViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                  viewMode === mode
-                    ? "bg-[#C8A96B] text-[#0D0D0D]"
-                    : "text-[#5A6A5A] hover:text-[#EAE6DD]"
-                }`}
-              >
-                {mode === "list" ? "Lista" : "Calendario"}
-              </button>
-            ))}
-          </div>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-[#EAE6DD]">Agenda existencial</h2>
+          <p className="text-[#5A6A5A] text-sm mt-1">
+            Tu tiempo vital, categorizado por lo que sostiene y lo que nutre.
+          </p>
+        </div>
+        <div className="flex items-center bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg p-1">
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-3 py-2 bg-[#C8A96B] text-[#0D0D0D] text-sm font-medium rounded-lg hover:bg-[#D4B87A] transition-colors"
+            type="button"
+            onClick={() => setViewMode("day")}
+            className={`px-3 py-1.5 text-sm rounded ${
+              viewMode === "day"
+                ? "bg-[#C8A96B] text-[#0D0D0D]"
+                : "text-[#5A6A5A] hover:text-[#EAE6DD]"
+            }`}
           >
-            + Evento
+            Día
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("week")}
+            className={`px-3 py-1.5 text-sm rounded ${
+              viewMode === "week"
+                ? "bg-[#C8A96B] text-[#0D0D0D]"
+                : "text-[#5A6A5A] hover:text-[#EAE6DD]"
+            }`}
+          >
+            Semana
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {FILTER_OPTIONS.map(({ key, label, color }) => (
-          <button
-            key={key}
-            onClick={() => toggleFilter(key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              activeFilters[key]
-                ? "border-transparent text-[#0D0D0D]"
-                : "border-[#2A2A2A] text-[#5A6A5A] bg-transparent"
-            }`}
-            style={activeFilters[key] ? { backgroundColor: color } : {}}
-          >
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: activeFilters[key] ? "#0D0D0D" : color }}
-            />
-            {label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setShowForm((v) => !v)}
+          className="text-sm text-[#C8A96B] hover:underline"
+        >
+          {showForm ? "Cancelar" : "+ Nuevo bloque"}
+        </button>
+        <div className="flex items-center gap-4">
+          <Link href="/agenda/balance" className="text-sm text-[#C8A96B] hover:underline">
+            Balance del día
+          </Link>
+          <Link href="/agenda/day-close" className="text-sm text-[#C8A96B] hover:underline">
+            Cerrar el día →
+          </Link>
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="bg-[#0A0A0A] border border-[#2A2A2A] rounded-xl p-6">
-        {isLoading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-6 h-6 border-2 border-[#C8A96B] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : viewMode === "list" ? (
-          <ListView items={visibleItems} onEditItem={setEditingItem} />
-        ) : (
-          <CalendarView
-            items={visibleItems}
-            year={calYear}
-            month={calMonth}
-            onMonthChange={(y, m) => {
-              setCalYear(y);
-              setCalMonth(m);
-            }}
-            onEditItem={setEditingItem}
-          />
-        )}
-      </div>
-
-      {showCreateModal && (
-        <CreateEventModal
-          onClose={() => setShowCreateModal(false)}
-          onCreated={fetchItems}
+      {showForm && (
+        <NewTimeBlockForm
+          defaultDate={selectedDate}
+          onCreated={(block) => {
+            setBlocks((current) => [block, ...current]);
+            setShowForm(false);
+          }}
+          onCancel={() => setShowForm(false)}
         />
       )}
 
-      {editingItem && (
-        <EditEventModal
-          item={editingItem}
-          onClose={() => setEditingItem(null)}
-          onUpdated={() => {
-            setEditingItem(null);
-            fetchItems();
-          }}
-        />
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => shiftDate(viewMode === "day" ? -1 : -7)}
+          className="text-sm text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
+        >
+          ← Anterior
+        </button>
+        <span className="text-sm text-[#EAE6DD]">
+          {viewMode === "day"
+            ? formatUtcDate(selectedDate, { weekday: "long", day: "numeric", month: "long" })
+            : `${formatUtcDate(weekStart, { day: "numeric", month: "short" })} – ${formatUtcDate(
+                addUtcDays(weekStart, 6),
+                { day: "numeric", month: "short" }
+              )}`}
+        </span>
+        <button
+          type="button"
+          onClick={() => shiftDate(viewMode === "day" ? 1 : 7)}
+          className="text-sm text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
+        >
+          Siguiente →
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-8 text-center">
+          <p className="text-[#5A6A5A] text-sm">Cargando tu agenda...</p>
+        </div>
+      ) : error ? (
+        <div className="bg-red-950/40 border border-red-800 text-red-400 text-sm rounded-lg px-4 py-3">
+          {error}
+        </div>
+      ) : viewMode === "day" ? (
+        <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-6 space-y-3">
+          {dayBlocks.length === 0 ? (
+            <p className="text-[#5A6A5A] text-sm text-center py-6">
+              Sin bloques de tiempo para este día.
+            </p>
+          ) : (
+            dayBlocks.map((block) => <TimeBlockCard key={block.id} block={block} />)
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-7 gap-3">
+          {weekDays.map((day, index) => {
+            const key = toDateKey(day);
+            const items = blocksByDate.get(key) ?? [];
+            return (
+              <div
+                key={key}
+                className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-3 space-y-2"
+              >
+                <p className="text-xs text-[#5A6A5A] uppercase tracking-wide">
+                  {WEEKDAY_LABEL[index]} {day.getUTCDate()}
+                </p>
+                {items.length === 0 ? (
+                  <p className="text-[#5A6A5A] text-xs">—</p>
+                ) : (
+                  items.map((block) => <TimeBlockCard key={block.id} block={block} />)
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
