@@ -4,6 +4,7 @@ import type {
   EnergyTag,
   ExistentialCategory,
   TimeBlock,
+  TimeBlockStatus,
 } from "@/types";
 
 // The backend runs with TIME_ZONE = "UTC" and buckets every TimeBlock by
@@ -84,6 +85,25 @@ export const ENERGY_TAG_COLOR: Record<EnergyTag, string> = {
   NEUTRAL: "#5A6A5A",
   DRAINS: "#C4685A",
 };
+
+export const TIME_BLOCK_STATUS_LABEL: Record<TimeBlockStatus, string> = {
+  PLANNED: "Planificado",
+  FULFILLED: "Cumplido",
+  OMITTED: "Omitido",
+};
+
+export const TIME_BLOCK_STATUS_COLOR: Record<TimeBlockStatus, string> = {
+  PLANNED: "#6B7A8F",
+  FULFILLED: "#7FB88A",
+  OMITTED: "#C4685A",
+};
+
+// Hora de fin derivada de start_datetime + duration_minutes; null si el
+// bloque no tiene horario (registro retroactivo sin start_datetime).
+export function blockEndTime(block: TimeBlock): Date | null {
+  if (!block.start_datetime) return null;
+  return new Date(new Date(block.start_datetime).getTime() + block.duration_minutes * 60000);
+}
 
 export const UNASSIGNED_LABEL = "Sin asignar";
 export const UNASSIGNED_COLOR = "#3A3A3A";

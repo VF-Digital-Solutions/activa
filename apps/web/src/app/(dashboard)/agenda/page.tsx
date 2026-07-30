@@ -7,6 +7,7 @@ import { timeBlockService } from "@/services/timeBlocks";
 import {
   addUtcDays,
   blockDateKey,
+  blockEndTime,
   ENERGY_TAG_COLOR,
   ENERGY_TAG_LABEL,
   ENERGY_TAG_ORDER,
@@ -14,6 +15,8 @@ import {
   EXISTENTIAL_CATEGORY_LABEL,
   EXISTENTIAL_CATEGORY_ORDER,
   formatUtcDate,
+  TIME_BLOCK_STATUS_COLOR,
+  TIME_BLOCK_STATUS_LABEL,
   toDateKey,
   todayUtc,
 } from "@/lib/agenda";
@@ -46,14 +49,32 @@ function formatBlockTime(block: TimeBlock): string {
   });
 }
 
-function TimeBlockCard({ block }: { block: TimeBlock }) {
+function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString("es", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function TimeBlockCard({ block, onClick }: { block: TimeBlock; onClick?: () => void }) {
   const energyColor = ENERGY_TAG_COLOR[block.energy_tag];
   const categoryColor = EXISTENTIAL_CATEGORY_COLOR[block.existential_category];
 
   return (
     <div
-      className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg p-3 border-l-4"
+      className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg p-3 border-l-4 cursor-pointer hover:border-[#3A3A3A] transition-colors"
       style={{ borderLeftColor: categoryColor }}
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-[#EAE6DD] font-medium truncate">{block.title}</p>
@@ -71,6 +92,92 @@ function TimeBlockCard({ block }: { block: TimeBlock }) {
         <span className="text-[#5A6A5A]">
           {formatBlockTime(block)} · {block.duration_minutes} min
         </span>
+      </div>
+    </div>
+  );
+}
+
+function TimeBlockDetailModal({
+  block,
+  replacedByTitle,
+  onClose,
+}: {
+  block: TimeBlock;
+  replacedByTitle: string | null;
+  onClose: () => void;
+}) {
+  const categoryColor = EXISTENTIAL_CATEGORY_COLOR[block.existential_category];
+  const energyColor = ENERGY_TAG_COLOR[block.energy_tag];
+  const statusColor = TIME_BLOCK_STATUS_COLOR[block.status];
+  const endTime = blockEndTime(block);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#111111] border border-[#2A2A2A] rounded-xl w-full max-w-md flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="flex items-start justify-between gap-3 p-5 border-b border-[#2A2A2A] border-l-4"
+          style={{ borderLeftColor: categoryColor }}
+        >
+          <h2 className="text-base font-semibold text-[#EAE6DD]">{block.title}</h2>
+          <button
+            onClick={onClose}
+            className="text-[#5A6A5A] hover:text-[#EAE6DD] transition-colors shrink-0"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <span
+              className="text-xs px-2 py-1 rounded"
+              style={{ color: categoryColor, backgroundColor: `${categoryColor}22` }}
+            >
+              {EXISTENTIAL_CATEGORY_LABEL[block.existential_category]}
+            </span>
+            <span
+              className="text-xs px-2 py-1 rounded"
+              style={{ color: energyColor, backgroundColor: `${energyColor}22` }}
+            >
+              {ENERGY_TAG_LABEL[block.energy_tag]}
+            </span>
+            <span
+              className="text-xs px-2 py-1 rounded"
+              style={{ color: statusColor, backgroundColor: `${statusColor}22` }}
+            >
+              {TIME_BLOCK_STATUS_LABEL[block.status]}
+            </span>
+          </div>
+
+          <div className="text-sm text-[#EAE6DD] space-y-1">
+            {block.start_datetime ? (
+              <p>
+                {formatDateTime(block.start_datetime)}
+                {endTime && ` – ${endTime.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}`}
+              </p>
+            ) : (
+              <p className="text-[#5A6A5A]">Registrado sin horario planificado</p>
+            )}
+            <p className="text-[#5A6A5A] text-xs">{block.duration_minutes} minutos</p>
+          </div>
+
+          {block.status === "OMITTED" && block.replaced_by && (
+            <p className="text-sm text-[#C8A96B]">
+              Reasignado a: {replacedByTitle ?? block.replaced_by}
+            </p>
+          )}
+
+          <div className="text-xs text-[#5A6A5A] space-y-0.5 pt-2 border-t border-[#2A2A2A]">
+            <p>Creado: {formatDateTime(block.created_at)}</p>
+            <p>Actualizado: {formatDateTime(block.updated_at)}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -270,6 +377,7 @@ export default function AgendaPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [showForm, setShowForm] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayUtc);
+  const [selectedBlock, setSelectedBlock] = useState<TimeBlock | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -317,6 +425,11 @@ export default function AgendaPage() {
 
   const selectedKey = toDateKey(selectedDate);
   const dayBlocks = blocksByDate.get(selectedKey) ?? [];
+
+  const replacedByTitle = useMemo(() => {
+    if (!selectedBlock?.replaced_by) return null;
+    return blocks.find((b) => b.id === selectedBlock.replaced_by)?.title ?? null;
+  }, [blocks, selectedBlock]);
 
   const shiftDate = (deltaDays: number) => {
     setSelectedDate((current) => addUtcDays(current, deltaDays));
@@ -426,7 +539,13 @@ export default function AgendaPage() {
               Sin bloques de tiempo para este día.
             </p>
           ) : (
-            dayBlocks.map((block) => <TimeBlockCard key={block.id} block={block} />)
+            dayBlocks.map((block) => (
+              <TimeBlockCard
+                key={block.id}
+                block={block}
+                onClick={() => setSelectedBlock(block)}
+              />
+            ))
           )}
         </div>
       ) : (
@@ -445,12 +564,26 @@ export default function AgendaPage() {
                 {items.length === 0 ? (
                   <p className="text-[#5A6A5A] text-xs">—</p>
                 ) : (
-                  items.map((block) => <TimeBlockCard key={block.id} block={block} />)
+                  items.map((block) => (
+                    <TimeBlockCard
+                      key={block.id}
+                      block={block}
+                      onClick={() => setSelectedBlock(block)}
+                    />
+                  ))
                 )}
               </div>
             );
           })}
         </div>
+      )}
+
+      {selectedBlock && (
+        <TimeBlockDetailModal
+          block={selectedBlock}
+          replacedByTitle={replacedByTitle}
+          onClose={() => setSelectedBlock(null)}
+        />
       )}
     </div>
   );
