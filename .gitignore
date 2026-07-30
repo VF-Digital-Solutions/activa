@@ -48,3 +48,6 @@ yarn-error.log*
 apps/web/next-env.d.ts
 
 node_modules/
+
+# tamagui build cache (regenerated on next build/dev)
+.tamagui/
