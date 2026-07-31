@@ -1,4 +1,13 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Activa frontend — a [Next.js](https://nextjs.org) app (originally bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app)).
+
+## Environment Variables
+
+Copy `apps/web/.env.example` to `apps/web/.env.local` and adjust as needed:
+
+| Variable | Scope | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_DEV_BYPASS_AUTH` | client | When `true`, skips login and auto-authenticates as a fake dev user (see `src/app/providers.tsx`). Keep `false` outside local dev. |
+| `API_INTERNAL_URL` | server | Base URL the Next.js server proxies `/api/v1/*` requests to (see `next.config.ts` rewrites). Defaults to `http://localhost:8000`; set to `http://api:8000` when running via the repo-root `docker-compose.yml`, where the API is reachable at the `api` service hostname instead of `localhost`. |
 
 ## Getting Started
 
