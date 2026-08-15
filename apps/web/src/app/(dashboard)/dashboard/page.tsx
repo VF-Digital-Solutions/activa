@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useAuthStore } from "@/store/auth";
 import { emotionalLogService } from "@/services/capitals";
 import { insightService } from "@/services/insight";
+import { sleepLogService } from "@/services/health";
 import { EmotionalLogForm } from "@/components/shared/EmotionalLogForm";
+import { SleepLogForm } from "@/components/shared/SleepLogForm";
 import type { IVISnapshot } from "@/types";
 
 function QuickEmotionalLog() {
@@ -30,6 +32,37 @@ function QuickEmotionalLog() {
 
       <EmotionalLogForm
         onSubmit={(payload) => emotionalLogService.create(payload)}
+        onLogged={() => {
+          setJustLogged(true);
+          setTimeout(() => setJustLogged(false), 2500);
+        }}
+      />
+    </div>
+  );
+}
+
+function QuickSleepLog() {
+  const [justLogged, setJustLogged] = useState(false);
+
+  return (
+    <div className="bg-[#111111] border border-[#2A2A2A] rounded-lg p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-medium text-[#EAE6DD]">¿Cómo dormiste?</h3>
+        <div className="flex items-center gap-3">
+          {justLogged && (
+            <span className="text-xs text-[#7FB88A]">Registrado ✓</span>
+          )}
+          <Link
+            href="/health/sleep-history"
+            className="text-xs text-[#5A6A5A] hover:text-[#C8A96B] transition-colors"
+          >
+            Ver historial
+          </Link>
+        </div>
+      </div>
+
+      <SleepLogForm
+        onSubmit={(payload) => sleepLogService.upsert(payload)}
         onLogged={() => {
           setJustLogged(true);
           setTimeout(() => setJustLogged(false), 2500);
@@ -154,6 +187,8 @@ export default function DashboardPage() {
       <IVIHero />
 
       <QuickEmotionalLog />
+
+      <QuickSleepLog />
     </div>
   );
 }
