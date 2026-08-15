@@ -534,6 +534,17 @@ export interface ActivityLog {
   created_at: string;
 }
 
+export type MealType = "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
+
+export interface NutritionLog {
+  id: string;
+  meal_type: MealType;
+  description: string;
+  calories: number | null;
+  recorded_at: string;
+  created_at: string;
+}
+
 // ── Insight (IVI) ─────────────────────────────────────────────────────────────
 
 export interface IVISnapshot {

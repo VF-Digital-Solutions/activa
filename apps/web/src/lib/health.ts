@@ -1,4 +1,4 @@
-import type { ActivityIntensity, ActivityType, SleepQuality } from "@/types";
+import type { ActivityIntensity, ActivityType, MealType, SleepQuality } from "@/types";
 
 export const SLEEP_QUALITY_VALUES: SleepQuality[] = [1, 2, 3, 4, 5];
 
@@ -54,4 +54,13 @@ export const ACTIVITY_INTENSITY_COLOR: Record<ActivityIntensity, string> = {
   LOW: "#5A6A5A",
   MODERATE: "#C8A96B",
   HIGH: "#7FB88A",
+};
+
+export const MEAL_TYPE_ORDER: MealType[] = ["BREAKFAST", "LUNCH", "DINNER", "SNACK"];
+
+export const MEAL_TYPE_LABEL: Record<MealType, string> = {
+  BREAKFAST: "Desayuno",
+  LUNCH: "Almuerzo",
+  DINNER: "Cena",
+  SNACK: "Colación",
 };
