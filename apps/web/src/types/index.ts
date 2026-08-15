@@ -496,6 +496,21 @@ export interface EmotionalAggregates {
   trend_direction: TrendDirection;
 }
 
+// ── Health ────────────────────────────────────────────────────────────────────
+
+export type SleepQuality = 1 | 2 | 3 | 4 | 5;
+
+export interface SleepLog {
+  id: string;
+  sleep_date: string;
+  bedtime: string | null;
+  wake_time: string | null;
+  duration_hours: string;
+  quality: SleepQuality;
+  notes: string;
+  created_at: string;
+}
+
 // ── Insight (IVI) ─────────────────────────────────────────────────────────────
 
 export interface IVISnapshot {
