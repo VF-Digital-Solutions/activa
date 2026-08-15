@@ -1,5 +1,5 @@
 import apiClient from "@/lib/api/axios";
-import type { SleepLog, SleepQuality } from "@/types";
+import type { ActivityIntensity, ActivityLog, ActivityType, SleepLog, SleepQuality } from "@/types";
 
 export interface SleepLogPayload {
   sleep_date?: string;
@@ -20,6 +20,26 @@ export const sleepLogService = {
 
   list: async (): Promise<SleepLog[]> => {
     const response = await apiClient.get("/health/sleep-logs/");
+    return response.data;
+  },
+};
+
+export interface ActivityLogPayload {
+  activity_type: ActivityType;
+  duration_minutes: number;
+  intensity: ActivityIntensity;
+  calories_burned?: number;
+  notes?: string;
+}
+
+export const activityLogService = {
+  create: async (payload: ActivityLogPayload): Promise<ActivityLog> => {
+    const response = await apiClient.post("/health/activity-logs/", payload);
+    return response.data;
+  },
+
+  list: async (): Promise<ActivityLog[]> => {
+    const response = await apiClient.get("/health/activity-logs/");
     return response.data;
   },
 };

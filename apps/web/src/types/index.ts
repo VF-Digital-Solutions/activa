@@ -511,6 +511,29 @@ export interface SleepLog {
   created_at: string;
 }
 
+export type ActivityType =
+  | "WALK"
+  | "RUN"
+  | "CYCLING"
+  | "SWIMMING"
+  | "STRENGTH"
+  | "YOGA"
+  | "SPORTS"
+  | "OTHER";
+
+export type ActivityIntensity = "LOW" | "MODERATE" | "HIGH";
+
+export interface ActivityLog {
+  id: string;
+  activity_type: ActivityType;
+  duration_minutes: number;
+  intensity: ActivityIntensity;
+  calories_burned: number | null;
+  notes: string;
+  recorded_at: string;
+  created_at: string;
+}
+
 // ── Insight (IVI) ─────────────────────────────────────────────────────────────
 
 export interface IVISnapshot {
