@@ -578,6 +578,23 @@ export interface MedicationDoseLog {
   created_at: string;
 }
 
+export type BiometricIndicatorType =
+  | "WEIGHT"
+  | "BLOOD_PRESSURE"
+  | "HEART_RATE"
+  | "BLOOD_GLUCOSE"
+  | "BODY_TEMPERATURE";
+
+export interface BiometricLog {
+  id: string;
+  indicator_type: BiometricIndicatorType;
+  value: string;
+  secondary_value: string | null;
+  notes: string;
+  recorded_at: string;
+  created_at: string;
+}
+
 // ── Insight (IVI) ─────────────────────────────────────────────────────────────
 
 export interface IVISnapshot {

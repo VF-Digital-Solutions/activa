@@ -1,6 +1,7 @@
 import type {
   ActivityIntensity,
   ActivityType,
+  BiometricIndicatorType,
   MealType,
   MedicationFrequency,
   SleepQuality,
@@ -87,4 +88,37 @@ export const MEDICATION_FREQUENCY_LABEL: Record<MedicationFrequency, string> = {
   WEEKLY: "Semanal",
   AS_NEEDED: "Según necesidad",
   OTHER: "Otra",
+};
+
+export const BIOMETRIC_INDICATOR_ORDER: BiometricIndicatorType[] = [
+  "WEIGHT",
+  "BLOOD_PRESSURE",
+  "HEART_RATE",
+  "BLOOD_GLUCOSE",
+  "BODY_TEMPERATURE",
+];
+
+export const BIOMETRIC_INDICATOR_LABEL: Record<BiometricIndicatorType, string> = {
+  WEIGHT: "Peso",
+  BLOOD_PRESSURE: "Presión arterial",
+  HEART_RATE: "Frecuencia cardíaca",
+  BLOOD_GLUCOSE: "Glucosa",
+  BODY_TEMPERATURE: "Temperatura",
+};
+
+export const BIOMETRIC_INDICATOR_UNIT: Record<BiometricIndicatorType, string> = {
+  WEIGHT: "kg",
+  BLOOD_PRESSURE: "mmHg",
+  HEART_RATE: "lpm",
+  BLOOD_GLUCOSE: "mg/dL",
+  BODY_TEMPERATURE: "°C",
+};
+
+// Only BLOOD_PRESSURE uses a systolic/diastolic pair.
+export const BIOMETRIC_HAS_SECONDARY_VALUE: Record<BiometricIndicatorType, boolean> = {
+  WEIGHT: false,
+  BLOOD_PRESSURE: true,
+  HEART_RATE: false,
+  BLOOD_GLUCOSE: false,
+  BODY_TEMPERATURE: false,
 };

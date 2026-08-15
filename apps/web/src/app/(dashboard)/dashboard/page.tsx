@@ -267,6 +267,16 @@ export default function DashboardPage() {
           <span className="text-xs text-[#5A6A5A]">Ver medicaciones →</span>
         </div>
       </Link>
+
+      <Link
+        href="/health/biometrics"
+        className="block bg-[#111111] border border-[#2A2A2A] rounded-lg p-5 hover:border-[#C8A96B]/50 transition-colors"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-[#EAE6DD]">Indicadores biométricos</h3>
+          <span className="text-xs text-[#5A6A5A]">Ver indicadores →</span>
+        </div>
+      </Link>
     </div>
   );
 }
