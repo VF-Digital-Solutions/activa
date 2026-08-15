@@ -3,6 +3,8 @@ import type {
   ActivityIntensity,
   ActivityLog,
   ActivityType,
+  BiometricIndicatorType,
+  BiometricLog,
   MealType,
   Medication,
   MedicationDoseLog,
@@ -114,6 +116,25 @@ export const medicationDoseLogService = {
 
   list: async (): Promise<MedicationDoseLog[]> => {
     const response = await apiClient.get("/health/medication-dose-logs/");
+    return response.data;
+  },
+};
+
+export interface BiometricLogPayload {
+  indicator_type: BiometricIndicatorType;
+  value: number;
+  secondary_value?: number;
+  notes?: string;
+}
+
+export const biometricLogService = {
+  create: async (payload: BiometricLogPayload): Promise<BiometricLog> => {
+    const response = await apiClient.post("/health/biometric-logs/", payload);
+    return response.data;
+  },
+
+  list: async (): Promise<BiometricLog[]> => {
+    const response = await apiClient.get("/health/biometric-logs/");
     return response.data;
   },
 };
