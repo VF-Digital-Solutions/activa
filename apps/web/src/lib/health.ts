@@ -1,4 +1,10 @@
-import type { ActivityIntensity, ActivityType, MealType, SleepQuality } from "@/types";
+import type {
+  ActivityIntensity,
+  ActivityType,
+  MealType,
+  MedicationFrequency,
+  SleepQuality,
+} from "@/types";
 
 export const SLEEP_QUALITY_VALUES: SleepQuality[] = [1, 2, 3, 4, 5];
 
@@ -63,4 +69,22 @@ export const MEAL_TYPE_LABEL: Record<MealType, string> = {
   LUNCH: "Almuerzo",
   DINNER: "Cena",
   SNACK: "Colación",
+};
+
+export const MEDICATION_FREQUENCY_ORDER: MedicationFrequency[] = [
+  "ONCE_DAILY",
+  "TWICE_DAILY",
+  "THREE_TIMES_DAILY",
+  "WEEKLY",
+  "AS_NEEDED",
+  "OTHER",
+];
+
+export const MEDICATION_FREQUENCY_LABEL: Record<MedicationFrequency, string> = {
+  ONCE_DAILY: "Una vez al día",
+  TWICE_DAILY: "Dos veces al día",
+  THREE_TIMES_DAILY: "Tres veces al día",
+  WEEKLY: "Semanal",
+  AS_NEEDED: "Según necesidad",
+  OTHER: "Otra",
 };
