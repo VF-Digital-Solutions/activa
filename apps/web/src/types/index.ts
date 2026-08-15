@@ -545,6 +545,39 @@ export interface NutritionLog {
   created_at: string;
 }
 
+export type MedicationFrequency =
+  | "ONCE_DAILY"
+  | "TWICE_DAILY"
+  | "THREE_TIMES_DAILY"
+  | "WEEKLY"
+  | "AS_NEEDED"
+  | "OTHER";
+
+export interface Medication {
+  id: string;
+  name: string;
+  dosage: string;
+  frequency: MedicationFrequency;
+  reminder_times: string[];
+  start_date: string;
+  end_date: string | null;
+  is_active: boolean;
+  notes: string;
+  created_at: string;
+}
+
+export type MedicationDoseStatus = "TAKEN" | "SKIPPED";
+
+export interface MedicationDoseLog {
+  id: string;
+  medication: string;
+  medication_name: string;
+  status: MedicationDoseStatus;
+  notes: string;
+  taken_at: string;
+  created_at: string;
+}
+
 // ── Insight (IVI) ─────────────────────────────────────────────────────────────
 
 export interface IVISnapshot {

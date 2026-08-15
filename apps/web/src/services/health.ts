@@ -4,6 +4,10 @@ import type {
   ActivityLog,
   ActivityType,
   MealType,
+  Medication,
+  MedicationDoseLog,
+  MedicationDoseStatus,
+  MedicationFrequency,
   NutritionLog,
   SleepLog,
   SleepQuality,
@@ -66,6 +70,50 @@ export const nutritionLogService = {
 
   list: async (): Promise<NutritionLog[]> => {
     const response = await apiClient.get("/health/nutrition-logs/");
+    return response.data;
+  },
+};
+
+export interface MedicationPayload {
+  name: string;
+  dosage: string;
+  frequency: MedicationFrequency;
+  reminder_times?: string[];
+  notes?: string;
+}
+
+export const medicationService = {
+  create: async (payload: MedicationPayload): Promise<Medication> => {
+    const response = await apiClient.post("/health/medications/", payload);
+    return response.data;
+  },
+
+  list: async (): Promise<Medication[]> => {
+    const response = await apiClient.get("/health/medications/");
+    return response.data;
+  },
+
+  update: async (id: string, payload: Partial<MedicationPayload & { is_active: boolean }>) => {
+    const response = await apiClient.patch(`/health/medications/${id}/`, payload);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/health/medications/${id}/`);
+  },
+};
+
+export const medicationDoseLogService = {
+  create: async (medication: string, status: MedicationDoseStatus): Promise<MedicationDoseLog> => {
+    const response = await apiClient.post("/health/medication-dose-logs/", {
+      medication,
+      status,
+    });
+    return response.data;
+  },
+
+  list: async (): Promise<MedicationDoseLog[]> => {
+    const response = await apiClient.get("/health/medication-dose-logs/");
     return response.data;
   },
 };
